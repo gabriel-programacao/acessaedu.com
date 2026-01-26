@@ -175,29 +175,50 @@
             .main-content { margin-left: 0; padding: 0; }
             .card-premium { border: none; box-shadow: none; background: white; }
         }
+
+        /* AJUSTE PARA CELULAR (RESPONSIVIDADE) */
+@media (max-width: 992px) {
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+        padding: 20px;
+    }
+    .main-content {
+        margin-left: 0 !important;
+        padding: 20px !important;
+    }
+    .nav-link-pe {
+        padding: 10px;
+        font-size: 0.9rem;
+    }
+    /* Faz os stats (cards de números) ficarem um abaixo do outro no celular */
+    .stat-box h1 {
+        font-size: 2.5rem;
+    }
+}
     </style>
 </head>
 <body>
 
     <aside class="sidebar no-print">
-        <div class="text-center mb-5">
-            <img src="logo_acessaedu.png" height="60" class="mb-2">
-            <h5 class="fw-bold text-white mb-0">Acessa <span class="text-warning">Edu</span></h5>
-            <small class="opacity-50">Criado por Gabriel Santos</small>
-        </div>
-        
-        <div id="menu-links"></div>
+    <div class="text-center mb-4 d-none d-lg-block">
+        <img src="logo_acessaedu.png" height="50" class="mb-3">
+        <h5 class="fw-bold text-white mb-0">Acessa <span class="text-warning">Edu</span></h5>
+    </div>
+    
+    <div id="menu-links" class="d-flex flex-column gap-1"></div>
 
-        <div class="mt-auto pt-5">
-            <div class="p-3 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-10">
-                <small class="d-block opacity-50 mb-2">INSTITUIÇÃO</small>
-                <h6 id="school-display" class="fw-bold mb-0">---</h6>
-            </div>
-            <button class="btn btn-danger w-100 mt-3 rounded-4 py-3 fw-bold" onclick="window.logout()">
-                <i class="fas fa-power-off me-2"></i>SAIR
-            </button>
+    <div class="mt-4 pt-3 border-top border-white border-opacity-10">
+        <div class="p-3 rounded-4 bg-white bg-opacity-10 mb-3">
+            <small class="d-block opacity-50 mb-1">INSTITUIÇÃO</small>
+            <h6 id="school-display" class="fw-bold mb-0 small">---</h6>
         </div>
-    </aside>
+        <button class="btn btn-danger w-100 rounded-4 py-2 fw-bold small" onclick="window.logout()">
+            <i class="fas fa-power-off me-2"></i>SAIR
+        </button>
+    </div>
+</aside>
 
     <main class="main-content">
         
