@@ -10,88 +10,37 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root { --pe-blue: #003399; --pe-yellow: #ffcc00; --pe-green: #10b981; --pe-red: #cc0000; }
-        
-        body { 
-            background: linear-gradient(135deg, var(--pe-blue) 0%, #001a4d 100%); 
-            color: white; font-family: 'Poppins', sans-serif; 
-            height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; 
-            margin: 0;
-        }
-
-        .terminal-container {
-            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(15px);
-            border-radius: 40px; padding: 40px; border: 1px solid rgba(255, 255, 255, 0.2);
-            width: 90%; max-width: 650px; text-align: center; box-shadow: 0 25px 50px rgba(0,0,0,0.3);
-        }
-
+        body { background: linear-gradient(135deg, var(--pe-blue) 0%, #001a4d 100%); color: white; font-family: 'Poppins', sans-serif; height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 0; }
+        .terminal-container { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(15px); border-radius: 40px; padding: 40px; border: 1px solid rgba(255, 255, 255, 0.2); width: 90%; max-width: 650px; text-align: center; box-shadow: 0 25px 50px rgba(0,0,0,0.3); }
         .logo-terminal { background: rgba(255, 255, 255, 0.15); padding: 15px; border-radius: 20px; margin-bottom: 25px; }
-        
-        video { 
-            width: 100%; border-radius: 25px; border: 5px solid white; transform: scaleX(-1); 
-            box-shadow: 0 15px 35px rgba(0,0,0,0.4); background: #000;
-        }
-
+        video { width: 100%; border-radius: 25px; border: 5px solid white; transform: scaleX(-1); box-shadow: 0 15px 35px rgba(0,0,0,0.4); background: #000; }
         .feedback-area { margin-top: 30px; min-height: 140px; transition: 0.5s; }
-        
-        .card-aluno {
-            background: var(--pe-green); color: white; padding: 20px; border-radius: 25px;
-            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-        }
-
-        .card-bloqueio {
-            background: var(--pe-red); color: white; padding: 20px; border-radius: 25px;
-            animation: shake 0.5s ease-in-out;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-        }
-
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-10px); }
-            75% { transform: translateX(10px); }
-        }
-
-        .btn-voltar {
-            position: fixed; top: 20px; left: 20px; background: rgba(255,255,255,0.2);
-            color: white; border-radius: 30px; padding: 8px 20px; text-decoration: none;
-            backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.3); transition: 0.3s;
-        }
+        .card-aluno { background: var(--pe-green); color: white; padding: 20px; border-radius: 25px; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+        .card-bloqueio { background: var(--pe-red); color: white; padding: 20px; border-radius: 25px; animation: shake 0.5s ease-in-out; box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+        .btn-voltar { position: fixed; top: 20px; left: 20px; background: rgba(255,255,255,0.2); color: white; border-radius: 30px; padding: 8px 20px; text-decoration: none; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.3); transition: 0.3s; z-index: 100; }
         .btn-voltar:hover { background: white; color: var(--pe-blue); }
-
-        @keyframes popIn {
-            from { opacity: 0; transform: scale(0.5); }
-            to { opacity: 1; scale(1); }
-        }
-
+        @keyframes popIn { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; scale(1); } }
         .loader { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid white; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; display: inline-block; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-    <a href="index.html" class="btn-voltar"><i class="fas fa-arrow-left me-2"></i> Painel</a>
+    <a href="dashboard.html" class="btn-voltar"><i class="fas fa-arrow-left me-2"></i> Voltar</a>
 
     <div class="terminal-container">
-        <div class="logo-terminal">
-            <img src="logo_acessaedu.png" alt="AcessaEdu" class="img-fluid" style="max-height: 70px;">
-        </div>
-
+        <div class="logo-terminal"><img src="logo_acessaedu.png" alt="AcessaEdu" class="img-fluid" style="max-height: 70px;"></div>
         <video id="video" autoplay muted playsinline></video>
-
         <div class="feedback-area" id="display">
-            <div id="loading">
-                <div class="loader mb-2"></div>
-                <p class="small">Sincronizando Banco de Dados...</p>
-            </div>
-            <p class="fs-4 fw-bold mt-3" style="opacity: 0.8;">Posicione seu rosto para identificação</p>
+            <div id="loading"><div class="loader mb-2"></div><p class="small">Iniciando Terminal Inteligente...</p></div>
+            <p class="fs-4 fw-bold mt-3" style="opacity: 0.8;">Aguardando identificação...</p>
         </div>
     </div>
 
-    <p class="mt-4 small opacity-50">SIAF PE - Sistema de Identificação de Alunos e Frequência</p>
-
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, getDocs, addDoc, query, where, doc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, getDoc, doc, addDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
         const firebaseConfig = { 
@@ -110,48 +59,59 @@
         const logado = JSON.parse(localStorage.getItem('usuarioLogado'));
         let ultimoNomeDetectado = ""; 
         let tempoUltimaDeteccao = 0;
+        let isProcessing = false;
+        let configEscola = null; // Armazenará os dados da Z-API
 
         onAuthStateChanged(auth, (user) => {
-            if (user) { initTerminal(); } 
-            else { document.getElementById('display').innerHTML = "Sessão expirada."; }
+            if (user) carregarConfiguracoes();
+            else window.location.href = 'index.html';
         });
 
-        async function initTerminal() {
+        async function carregarConfiguracoes() {
             if(!logado) return;
+            try {
+                // Busca os dados da escola (incluindo Z-API)
+                const docRef = doc(db, "unidades", logado.escolaId);
+                const snap = await getDoc(docRef);
+                if(snap.exists()) {
+                    configEscola = snap.data();
+                    initTerminal();
+                } else {
+                    alert("Erro ao carregar configurações da unidade.");
+                }
+            } catch (e) { console.error(e); }
+        }
 
+        async function initTerminal() {
             try {
                 const URL_MODELS = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
                 await faceapi.nets.tinyFaceDetector.loadFromUri(URL_MODELS);
                 await faceapi.nets.faceLandmark68Net.loadFromUri(URL_MODELS);
                 await faceapi.nets.faceRecognitionNet.loadFromUri(URL_MODELS);
 
-                document.getElementById('video').srcObject = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                document.getElementById('video').srcObject = stream;
                 
-                const qAlunos = query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId));
-                const snap = await getDocs(qAlunos);
-                
+                const snap = await getDocs(query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId)));
                 const mapaAlunos = {};
                 const labledDescriptors = [];
 
                 snap.forEach(d => {
                     const data = d.data();
                     if(data.descritor) {
-                        // Mapeamos nome para obter Turma e Telefone rapidamente no sucesso
-                        mapaAlunos[data.nome] = { sala: data.sala || "Sem Turma", tel: data.tel };
+                        mapaAlunos[data.nome] = { sala: data.sala || "Sem Turma", tel: data.tel || "" };
                         labledDescriptors.push(new faceapi.LabeledFaceDescriptors(data.nome, [new Float32Array(data.descritor)]));
                     }
                 });
 
                 if(labledDescriptors.length === 0) {
-                    document.getElementById('display').innerText = "Nenhum FaceID cadastrado.";
+                    document.getElementById('display').innerHTML = "<p class='text-warning'>Nenhum rosto cadastrado nesta unidade.</p>";
                     return;
                 }
 
                 const faceMatcher = new faceapi.FaceMatcher(labledDescriptors, 0.55);
                 document.getElementById('loading').style.display = 'none';
                 
-                let isProcessing = false;
-
                 setInterval(async () => {
                     if(isProcessing) return;
 
@@ -164,90 +124,109 @@
 
                         if(match.label !== 'unknown') {
                             const nome = match.label;
+                            // Evita registrar a mesma pessoa em menos de 10 segundos no terminal
+                            if(nome === ultimoNomeDetectado && (agora - tempoUltimaDeteccao) < 10000) return;
 
-                            if(nome === ultimoNomeDetectado && (agora - tempoUltimaDeteccao) < 10000) {
-                                return;
-                            }
-
-                            isProcessing = true; 
-                            const infoAluno = mapaAlunos[nome];
+                            isProcessing = true;
+                            const info = mapaAlunos[nome];
                             const hoje = new Date().toLocaleDateString('pt-BR');
-                            const horaAgora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                            const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-                            const qFreq = query(collection(db, "frequencia"), 
+                            // Verifica se já bateu o ponto hoje no banco
+                            const qPresenca = query(
+                                collection(db, "frequencia"), 
                                 where("nome", "==", nome), 
                                 where("data", "==", hoje),
                                 where("escolaId", "==", logado.escolaId)
                             );
-                            const checkSnap = await getDocs(qFreq);
+                            const presencaSnap = await getDocs(qPresenca);
 
-                            if (!checkSnap.empty) {
+                            if (!presencaSnap.empty) {
                                 document.getElementById('display').innerHTML = `
                                     <div class="card-bloqueio">
                                         <h2 class="fw-bold mb-1">JÁ REGISTRADO</h2>
                                         <p class="mb-0">${nome.toUpperCase()}</p>
-                                    </div>
-                                `;
+                                        <small class="d-block mt-2">Sua entrada já foi computada hoje.</small>
+                                    </div>`;
+                                setTimeout(() => { resetDisplay(); }, 4000);
+                                return;
+                            }
+
+                            // Feedback Visual
+                            document.getElementById('display').innerHTML = `
+                                <div class="card-aluno">
+                                    <h2 class="fw-bold mb-1">BEM-VINDO(A)</h2>
+                                    <p class="mb-0">${nome.toUpperCase()}</p>
+                                    <small class="d-block mt-2" id="msg-status">Processando presença...</small>
+                                </div>`;
+
+                            // Salva no Firebase
+                            await addDoc(collection(db, "frequencia"), { 
+                                nome, 
+                                sala: info.sala, 
+                                escolaId: logado.escolaId, 
+                                data: hoje, 
+                                hora, 
+                                dataHora: serverTimestamp() 
+                            });
+
+                            // Dispara WhatsApp usando as chaves da escola
+                            if (info.tel) {
+                                await enviarNotificacaoZap(info.tel, nome, hora);
                             } else {
-                                document.getElementById('display').innerHTML = `
-                                    <div class="card-aluno">
-                                        <h2 class="fw-bold mb-1">CONFIRMADO</h2>
-                                        <p class="mb-0">${nome.toUpperCase()}</p>
-                                        <small class="d-block mt-2">Enviando aviso aos pais...</small>
-                                    </div>
-                                `;
-
-                                // 1. Registra no Firestore
-                                await addDoc(collection(db, "frequencia"), { 
-                                    nome: nome, sala: infoAluno.sala, escolaId: logado.escolaId,
-                                    data: hoje, hora: horaAgora,
-                                    dataHora: serverTimestamp() 
-                                });
-
-                                // 2. Dispara o WhatsApp via Z-API se houver telefone
-                                if (infoAluno.tel) {
-                                    enviarNotificacaoZap(infoAluno.tel, nome, horaAgora);
-                                }
+                                if(document.getElementById('msg-status')) document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
                             }
 
                             ultimoNomeDetectado = nome;
                             tempoUltimaDeteccao = agora;
-
-                            setTimeout(() => {
-                                document.getElementById('display').innerHTML = '<p class="fs-4 fw-bold mt-3" style="opacity: 0.8;">Posicione seu rosto para identificação</p>';
-                                isProcessing = false; 
-                            }, 3000);
+                            setTimeout(() => { resetDisplay(); }, 5000);
                         }
                     }
                 }, 700);
-            } catch (err) { console.error(err); }
+            } catch (err) { console.error(err); isProcessing = false; }
+        }
+
+        function resetDisplay() {
+            document.getElementById('display').innerHTML = '<p class="fs-4 fw-bold mt-3" style="opacity: 0.8;">Posicione seu rosto para identificação</p>'; 
+            isProcessing = false;
         }
 
         async function enviarNotificacaoZap(telefone, nome, hora) {
-            // Seus dados reais obtidos da captura de tela
-            const INSTANCIA_ID = "3EDDC6760283814A642BC2D3CEFFEDDF";
-            const TOKEN = "EBE7565CC968D9915CA7502C";
-            const API_URL = `https://api.z-api.io/instances/${INSTANCIA_ID}/token/${TOKEN}/send-text`;
-            
-            // Limpa o número (remove o que não é dígito)
-            let num = telefone.replace(/\D/g, '');
-            // Garante o código do país (Brasil = 55)
-            if (!num.startsWith('55')) num = '55' + num;
+            // Verifica se a escola tem Z-API configurada
+            if (!configEscola || !configEscola.z_instance || !configEscola.z_token) {
+                console.warn("Z-API não configurada para esta escola.");
+                if(document.getElementById('msg-status')) document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
+                return;
+            }
 
-            const mensagem = `*AcessaEdu Informa:*\n\n✅ O aluno *${nome}* registrou entrada na escola às *${hora}* hoje.`;
+            const API_URL = `https://api.z-api.io/instances/${configEscola.z_instance}/token/${configEscola.z_token}/send-text`;
+            const CLIENT_TOKEN = configEscola.z_client || "";
+
+            let num = telefone.replace(/\D/g, ''); 
+            if (num.length === 11) num = num.substring(0, 2) + num.substring(3); 
+            if (!num.startsWith('55')) num = '55' + num; 
 
             try {
-                await fetch(API_URL, {
+                const response = await fetch(API_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        phone: num,
-                        message: mensagem
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Client-Token': CLIENT_TOKEN
+                    },
+                    body: JSON.stringify({ 
+                        phone: num, 
+                        message: `*${configEscola.nome}:* Confirmamos a entrada do estudante *${nome}* às *${hora}*. ✅` 
                     })
                 });
-                console.log("Zap enviado com sucesso para:", num);
+                
+                if(response.ok) {
+                    if(document.getElementById('msg-status')) document.getElementById('msg-status').innerText = "Notificação enviada aos pais! ✅";
+                } else {
+                    if(document.getElementById('msg-status')) document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
+                }
             } catch (e) {
-                console.error("Erro ao enviar mensagem via Z-API:", e);
+                console.error("Falha Z-API:", e);
+                if(document.getElementById('msg-status')) document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
             }
         }
     </script>
