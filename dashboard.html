@@ -6,6 +6,7 @@
     <title>AcessaEdu | Dashboard</title>
     
     <link rel="icon" type="image/png" href="Icone_acessaedu.ico">
+    
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -13,6 +14,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
         :root {
@@ -376,15 +378,47 @@
             montarMenu(); initIA(); escutarDados();
         }
 
+        // --- NOVA FUNÇÃO DE VERIFICAÇÃO DE COTA ---
+        async function verificarCotaDisponivel() {
+            try {
+                const escDoc = await getDoc(doc(db, "unidades", logado.escolaId));
+                if (!escDoc.exists()) return { autorizado: false, msg: "Unidade não encontrada." };
+                const limite = escDoc.data().limiteAlunos || 0;
+                const qAlunos = query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId));
+                const snapAlunos = await getDocs(qAlunos);
+                const totalAtual = snapAlunos.size;
+                if (totalAtual >= limite) {
+                    return { autorizado: false, msg: `Limite de cota atingido (${totalAtual}/${limite}). Contrate um plano maior.` };
+                }
+                return { autorizado: true };
+            } catch (e) {
+                return { autorizado: false, msg: "Erro ao validar cota." };
+            }
+        }
+
         window.importarExcel = async (input) => {
             const status = document.getElementById('statusImportacao'); const file = input.files[0]; if (!file) return;
             status.innerText = "Lendo..."; const reader = new FileReader();
             reader.onload = async (e) => {
                 const data = new Uint8Array(e.target.result); const workbook = XLSX.read(data, { type: 'array' });
                 const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+                
+                // Validação de cota para Importação
+                const cota = await verificarCotaDisponivel();
+                if(!cota.autorizado) {
+                    status.innerText = "Erro: Limite atingido.";
+                    return Swal.fire("Limite de Alunos", cota.msg, "warning");
+                }
+
                 for (let i = 1; i < json.length; i++) {
                     const [nome, turma, tel] = json[i];
-                    if (nome && turma) await addDoc(collection(db, "alunos"), { nome: nome.toString(), sala: turma.toString(), escolaId: logado.escolaId, descritor: null, tel: tel ? tel.toString() : "" });
+                    if (nome && turma) {
+                        // Re-checar cota a cada inserção para garantir precisão
+                        const check = await verificarCotaDisponivel();
+                        if(!check.autorizado) break; 
+
+                        await addDoc(collection(db, "alunos"), { nome: nome.toString(), sala: turma.toString(), escolaId: logado.escolaId, descritor: null, tel: tel ? tel.toString() : "" });
+                    }
                 }
                 status.innerText = "Sucesso!";
             }; reader.readAsArrayBuffer(file);
@@ -424,10 +458,43 @@
         window.exportarRelatorioExcel = () => { XLSX.writeFile(XLSX.utils.table_to_book(document.getElementById("tabela-relatorio")), `SIAF_Relatorio.xlsx`); };
         window.imprimirRelatorio = () => { window.print(); };
 
-        document.getElementById('btnCam').onclick = async () => { const s = await navigator.mediaDevices.getUserMedia({ video: true }); document.getElementById('webcam').srcObject = s; };
-        async function initIA() { const U = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'; await faceapi.nets.tinyFaceDetector.loadFromUri(U); await faceapi.nets.faceLandmark68Net.loadFromUri(U); await faceapi.nets.faceRecognitionNet.loadFromUri(U); }
+        // --- ATUALIZAÇÃO SALVAR COM BIOMETRIA ---
+        document.getElementById('btnSalvar').onclick = async () => {
+            const n = document.getElementById('nAluno').value.trim();
+            const s = document.getElementById('sAluno').value;
+            const t = document.getElementById('tAluno').value.trim();
+            const v = document.getElementById('webcam');
 
-        window.salvarSemBiometria = async () => { const n = document.getElementById('nAluno').value, s = document.getElementById('sAluno').value; if(!n) return alert("Nome!"); await addDoc(collection(db, "alunos"), { nome: n, sala: s, escolaId: logado.escolaId, descritor: null, tel: document.getElementById('tAluno').value }); alert("Sucesso!"); document.getElementById('nAluno').value = ""; };
+            if(!n) return Swal.fire("Erro", "Nome obrigatório", "error");
+
+            const cota = await verificarCotaDisponivel();
+            if(!cota.autorizado) return Swal.fire("Limite Atingido", cota.msg, "warning");
+
+            const det = await faceapi.detectSingleFace(v, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+            if(!det) return Swal.fire("Atenção", "Rosto não detectado", "warning");
+
+            try {
+                await addDoc(collection(db, "alunos"), { nome: n, sala: s, escolaId: logado.escolaId, descritor: Array.from(det.descriptor), tel: t });
+                Swal.fire("Sucesso", "Aluno cadastrado!", "success");
+                document.getElementById('nAluno').value = ""; document.getElementById('tAluno').value = "";
+            } catch(e) { Swal.fire("Erro", "Falha ao salvar", "error"); }
+        };
+
+        async function initIA() { const U = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'; await faceapi.nets.tinyFaceDetector.loadFromUri(U); await faceapi.nets.faceLandmark68Net.loadFromUri(U); await faceapi.nets.faceRecognitionNet.loadFromUri(U); }
+        document.getElementById('btnCam').onclick = async () => { const s = await navigator.mediaDevices.getUserMedia({ video: true }); document.getElementById('webcam').srcObject = s; };
+
+        // --- ATUALIZAÇÃO SALVAR SEM BIOMETRIA ---
+        window.salvarSemBiometria = async () => { 
+            const n = document.getElementById('nAluno').value, s = document.getElementById('sAluno').value; 
+            if(!n) return Swal.fire("Erro", "Nome obrigatório", "error"); 
+
+            const cota = await verificarCotaDisponivel();
+            if(!cota.autorizado) return Swal.fire("Limite Atingido", cota.msg, "warning");
+
+            await addDoc(collection(db, "alunos"), { nome: n, sala: s, escolaId: logado.escolaId, descritor: null, tel: document.getElementById('tAluno').value }); 
+            Swal.fire("Sucesso", "Cadastrado com sucesso!", "success"); 
+            document.getElementById('nAluno').value = ""; 
+        };
 
         function escutarDados() {
             const q = query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId));
@@ -457,7 +524,6 @@
                         cardsBiometria += `<div class="col item-face" data-nome="${al.nome.toLowerCase()}"><div class="p-3 bg-white border rounded-4 d-flex justify-content-between align-items-center shadow-sm"><div><span class="fw-bold d-block small">${al.nome}</span><small class="${tem?'text-success':'text-danger'} fw-bold">${tem?'ATIVO':'SEM FACE'}</small></div><button class="btn btn-sm ${tem?'btn-outline-primary':'btn-primary'} px-3 rounded-3" onclick="window.abrirCapturaModal('${al.id}','${al.nome}')">${tem?'REFAZER':'VINCULAR'}</button></div></div>`;
                     });
 
-                    // MODELO QUE ABRE: Botão principal do accordion deve conter o data-bs-toggle
                     accordionE.innerHTML += `
                         <div class="accordion-item border-0 mb-3 shadow-sm rounded-4 overflow-hidden">
                             <div class="d-flex align-items-center bg-white pr-3">
@@ -489,7 +555,6 @@
             onSnapshot(query(collection(db, "frequencia"), where("escolaId", "==", logado.escolaId), where("data", "==", hj)), snap => { document.getElementById('st-presentes').innerText = snap.size; updateCharts(); });
         }
 
-        // --- FUNÇÕES BONITAS DE APAGAR TURMA ---
         window.abrirModalApagarTurma = (turma) => {
             turmaParaApagarGlobal = turma;
             document.getElementById('txtTurmaApagar').innerText = `Apagar ${turma}`;
@@ -499,19 +564,17 @@
 
         document.getElementById('btnConfirmarExclusaoFinal').onclick = async () => {
             const senha = document.getElementById('senhaApagarTurma').value;
-            if (senha !== logado.senha) return alert("SENHA INCORRETA!");
-
+            if (senha !== logado.senha) return Swal.fire("Erro", "Senha incorreta", "error");
             try {
                 const q = query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId), where("sala", "==", turmaParaApagarGlobal));
                 const snap = await getDocs(q);
                 const batch = writeBatch(db);
                 snap.forEach(d => batch.delete(d.ref));
                 await batch.commit();
-                
                 bootstrap.Modal.getInstance(document.getElementById('modalConfirmarApagarTurma')).hide();
-                alert(`Turma ${turmaParaApagarGlobal} removida.`);
+                Swal.fire("Apagado", "Turma removida com sucesso.", "success");
             } catch (e) {
-                alert("Erro ao excluir dados.");
+                Swal.fire("Erro", "Falha ao excluir.", "error");
             }
         };
 
