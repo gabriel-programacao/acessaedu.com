@@ -108,7 +108,7 @@
         const auth = getAuth(app);
         
         const logado = JSON.parse(localStorage.getItem('usuarioLogado'));
-        let ultimoNomeDetectado = ""; // Evita múltiplas leituras seguidas
+        let ultimoNomeDetectado = ""; 
         let tempoUltimaDeteccao = 0;
 
         onAuthStateChanged(auth, (user) => {
@@ -136,7 +136,8 @@
                 snap.forEach(d => {
                     const data = d.data();
                     if(data.descritor) {
-                        mapaAlunos[data.nome] = data.sala || "Sem Turma";
+                        // Mapeamos nome para obter Turma e Telefone rapidamente no sucesso
+                        mapaAlunos[data.nome] = { sala: data.sala || "Sem Turma", tel: data.tel };
                         labledDescriptors.push(new faceapi.LabeledFaceDescriptors(data.nome, [new Float32Array(data.descritor)]));
                     }
                 });
@@ -152,7 +153,6 @@
                 let isProcessing = false;
 
                 setInterval(async () => {
-                    // BLOQUEIO 1: Se já estiver processando um aluno, ignora novas detecções
                     if(isProcessing) return;
 
                     const video = document.getElementById('video');
@@ -165,16 +165,15 @@
                         if(match.label !== 'unknown') {
                             const nome = match.label;
 
-                            // BLOQUEIO 2: Delay de 10 segundos para o mesmo aluno (evita duplicatas)
                             if(nome === ultimoNomeDetectado && (agora - tempoUltimaDeteccao) < 10000) {
                                 return;
                             }
 
-                            isProcessing = true; // Trava o terminal
-                            const sala = mapaAlunos[nome];
+                            isProcessing = true; 
+                            const infoAluno = mapaAlunos[nome];
                             const hoje = new Date().toLocaleDateString('pt-BR');
+                            const horaAgora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-                            // Verifica se já registrou no banco
                             const qFreq = query(collection(db, "frequencia"), 
                                 where("nome", "==", nome), 
                                 where("data", "==", hoje),
@@ -194,28 +193,62 @@
                                     <div class="card-aluno">
                                         <h2 class="fw-bold mb-1">CONFIRMADO</h2>
                                         <p class="mb-0">${nome.toUpperCase()}</p>
+                                        <small class="d-block mt-2">Enviando aviso aos pais...</small>
                                     </div>
                                 `;
 
+                                // 1. Registra no Firestore
                                 await addDoc(collection(db, "frequencia"), { 
-                                    nome: nome, sala: sala, escolaId: logado.escolaId,
-                                    data: hoje, hora: new Date().toLocaleTimeString('pt-BR'),
+                                    nome: nome, sala: infoAluno.sala, escolaId: logado.escolaId,
+                                    data: hoje, hora: horaAgora,
                                     dataHora: serverTimestamp() 
                                 });
+
+                                // 2. Dispara o WhatsApp via Z-API se houver telefone
+                                if (infoAluno.tel) {
+                                    enviarNotificacaoZap(infoAluno.tel, nome, horaAgora);
+                                }
                             }
 
-                            // Atualiza os dados da última detecção bem-sucedida
                             ultimoNomeDetectado = nome;
                             tempoUltimaDeteccao = agora;
 
                             setTimeout(() => {
                                 document.getElementById('display').innerHTML = '<p class="fs-4 fw-bold mt-3" style="opacity: 0.8;">Posicione seu rosto para identificação</p>';
-                                isProcessing = false; // Destrava o terminal após 3 segundos de feedback visual
+                                isProcessing = false; 
                             }, 3000);
                         }
                     }
                 }, 700);
             } catch (err) { console.error(err); }
+        }
+
+        async function enviarNotificacaoZap(telefone, nome, hora) {
+            // Seus dados reais obtidos da captura de tela
+            const INSTANCIA_ID = "3EDDC6760283814A642BC2D3CEFFEDDF";
+            const TOKEN = "EBE7565CC968D9915CA7502C";
+            const API_URL = `https://api.z-api.io/instances/${INSTANCIA_ID}/token/${TOKEN}/send-text`;
+            
+            // Limpa o número (remove o que não é dígito)
+            let num = telefone.replace(/\D/g, '');
+            // Garante o código do país (Brasil = 55)
+            if (!num.startsWith('55')) num = '55' + num;
+
+            const mensagem = `*AcessaEdu Informa:*\n\n✅ O aluno *${nome}* registrou entrada na escola às *${hora}* hoje.`;
+
+            try {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        phone: num,
+                        message: mensagem
+                    })
+                });
+                console.log("Zap enviado com sucesso para:", num);
+            } catch (e) {
+                console.error("Erro ao enviar mensagem via Z-API:", e);
+            }
         }
     </script>
 </body>
