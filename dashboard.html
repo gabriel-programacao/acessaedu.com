@@ -235,7 +235,7 @@
                 <div class="col-6 col-md-3"><div class="stat-box h-100" style="background: linear-gradient(135deg, #003399 0%, #001a4d 100%);"><small class="opacity-75 fw-bold">MATRICULADOS</small><h1 id="st-total" class="fw-bold mt-2">0</h1><i class="fas fa-users"></i></div></div>
                 <div class="col-6 col-md-3"><div class="stat-box h-100" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);"><small class="opacity-75 fw-bold">PRESENTES</small><h1 id="st-presentes" class="fw-bold mt-2">0</h1><i class="fas fa-check-circle"></i></div></div>
                 <div class="col-6 col-md-3"><div class="stat-box h-100" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);"><small class="opacity-75 fw-bold">FALTAS</small><h1 id="st-faltas" class="fw-bold mt-2">0</h1><i class="fas fa-user-times"></i></div></div>
-                <div class="col-6 col-md-3"><div class="stat-box h-100" style="background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);"><small class="opacity-75 fw-bold">COTA AUTORIZADA</small><h1 id="st-cota-max" class="fw-bold mt-2">0</h1><i class="fas fa-shield-alt"></i></div></div>
+                <div class="col-6 col-md-3"><div class="stat-box h-100" style="background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);"><small class="opacity-75 fw-bold">AUTORIZADOS</small><h1 id="st-cota-max" class="fw-bold mt-2">0</h1><i class="fas fa-shield-alt"></i></div></div>
             </div>
             <div class="row">
                 <div class="col-lg-8"><div class="card-premium"><canvas id="chartBarras" height="150"></canvas></div></div>
@@ -370,14 +370,12 @@
             document.getElementById('data-atual').innerText = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', day: 'numeric' });
             document.getElementById('relData').valueAsDate = new Date();
             
-            // Monitorar bloqueio e COTA em tempo real
             onSnapshot(doc(db, "unidades", logado.escolaId), (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     if (data.status === 'Bloqueado') {
                         Swal.fire({ icon: 'error', title: 'Acesso Suspenso', text: 'Esta unidade foi bloqueada pelo administrador.', confirmButtonColor: '#003399' }).then(() => window.logout());
                     }
-                    // Atualiza o Card de Cota Máxima no Painel
                     document.getElementById('st-cota-max').innerText = data.limiteAlunos || 0;
                 }
             });
@@ -404,11 +402,9 @@
                 const snapAlunos = await getDocs(qAlunos);
                 const totalAtual = snapAlunos.size;
                 
-                // Atualiza a badge visual na seção de matrícula
                 const badge = document.getElementById('cota-badge');
                 if(badge) badge.innerText = `Cota: ${totalAtual}/${limite}`;
                 
-                // Atualiza o card de cota no Dashboard se estiver na aba de stats
                 const cardCota = document.getElementById('st-cota-max');
                 if(cardCota) cardCota.innerText = limite;
 
@@ -455,6 +451,14 @@
         }
 
         window.trocarAba = (id, btn) => {
+            // --- ACRESCENTADO: DESLIGAR CAMERA AO SAIR DA ABA MATRÍCULA ---
+            const video = document.getElementById('webcam');
+            if (video && video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+                document.getElementById('ia-status').innerText = "Câmera desligada automaticamente.";
+            }
+
             document.querySelectorAll('.secao').forEach(s => s.classList.remove('ativa'));
             document.getElementById(id).classList.add('ativa');
             document.querySelectorAll('.nav-link-pe').forEach(b => b.classList.remove('active'));
