@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AcessaEdu | Biblioteca Ultimate Elite</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        :root { 
+            --primary: #000a1f; --secondary: #003399; --accent: #ffcc00; 
+            --bg-body: #f4f7fc; --sidebar-w: 280px; --lux-blue: #0a21c0;
+            --success-btn: #10b981;
+        }
+
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--bg-body); margin: 0; color: #1e293b; overflow-x: hidden; }
+
+        /* --- SIDEBAR LUX --- */
+        .sidebar { width: var(--sidebar-w); background: var(--primary); height: 100vh; position: fixed; padding: 40px 20px; color: white; z-index: 1050; border-right: 1px solid rgba(255,255,255,0.05); }
+        .sidebar-brand h4 { font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: -1.5px; text-align: center; margin-bottom: 40px; }
+        .nav-link-pe { color: rgba(255,255,255,0.4); padding: 16px 20px; border-radius: 18px; display: flex; align-items: center; gap: 14px; text-decoration: none; margin-bottom: 8px; transition: 0.4s ease; font-weight: 600; cursor: pointer; }
+        .nav-link-pe:hover { background: rgba(255,255,255,0.05); color: white; transform: translateX(5px); }
+        .nav-link-pe.active { background: var(--accent); color: var(--primary); font-weight: 800; box-shadow: 0 10px 25px rgba(255, 204, 0, 0.2); }
+
+        /* --- MAIN CONTENT --- */
+        .main-content { margin-left: var(--sidebar-w); padding: 60px 80px; min-height: 100vh; }
+        .header-title h2 { font-size: 2.8rem; font-weight: 800; letter-spacing: -2px; color: var(--primary); }
+        
+        .content-section { display: none; opacity: 0; transform: translateY(20px); transition: 0.5s ease-out; }
+        .section-active { display: block; opacity: 1; transform: translateY(0); }
+
+        .card-lux { background: white; border-radius: 40px; padding: 45px; border: none; box-shadow: 0 25px 60px rgba(0,0,0,0.02); margin-bottom: 35px; border: 1px solid #f1f5f9; }
+        .stat-card { padding: 30px; border-radius: 35px; color: white; position: relative; overflow: hidden; height: 160px; display: flex; flex-direction: column; justify-content: center; transition: 0.4s; }
+        .stat-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.1); }
+        .stat-card h1 { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 3rem; margin: 0; }
+
+        .table-elite thead th { border: none; color: #94a3b8; text-transform: uppercase; font-size: 0.75rem; font-weight: 800; letter-spacing: 1.5px; padding: 20px; }
+        .table-elite tbody td { padding: 22px 20px; vertical-align: middle; border-bottom: 1px solid #f8fafc; }
+        .item-title { font-weight: 800; color: var(--primary); font-size: 1.1rem; display: block; margin-bottom: 2px; }
+        .item-subtitle { font-size: 0.85rem; color: #64748b; font-weight: 600; display: block; }
+
+        .turma-card { border-radius: 40px; background: white; padding: 40px; margin-bottom: 30px; box-shadow: 0 15px 40px rgba(0,0,0,0.02); border: 1px solid #f1f5f9; }
+        .turma-header { background: #f1f5f9; color: var(--secondary); padding: 12px 25px; border-radius: 18px; font-weight: 800; font-size: 0.9rem; margin-bottom: 20px; display: inline-flex; align-items: center; gap: 10px; border: 1px solid #e2e8f0; }
+
+        .modal-content { border-radius: 50px; border: none; padding: 40px; box-shadow: 0 50px 100px rgba(0,0,0,0.2); }
+        .modal-title-lux { font-family: 'Space Grotesk', sans-serif; font-weight: 800; color: var(--lux-blue); font-size: 2.2rem; text-align: center; margin-bottom: 30px; }
+        .form-control-lux { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 22px; padding: 18px 25px; font-weight: 600; margin-bottom: 20px; width: 100%; outline: none; transition: 0.3s; }
+
+        .btn-infinity { background: linear-gradient(135deg, var(--lux-blue) 0%, #001a4d 100%); color: white; border-radius: 20px; padding: 20px 40px; border: none; font-weight: 800; transition: 0.4s; box-shadow: 0 10px 25px rgba(10,33,192,0.2); width: 100%; }
+        .btn-infinity:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(10,33,192,0.35); color: var(--accent); }
+        
+        .search-container { position: relative; width: 100%; }
+        .search-results { position: absolute; top: 100%; left: 0; right: 0; background: white; border-radius: 25px; box-shadow: 0 20px 50px rgba(0,0,0,0.1); max-height: 250px; overflow-y: auto; z-index: 2000; display: none; padding: 10px; border: 1px solid #f1f5f9; margin-top: 8px; }
+        .search-item { padding: 15px 25px; cursor: pointer; border-radius: 18px; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
+        .search-item:hover { background: #f0f7ff; color: var(--secondary); }
+
+        .search-bar-elite { background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 20px; padding: 12px 25px; font-weight: 600; width: 300px; transition: 0.3s; }
+        .search-bar-elite:focus { border-color: var(--secondary); background: white; box-shadow: 0 10px 20px rgba(0,0,0,0.05); outline: none; }
+
+        .d-none { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <h4 class="text-white">Acessa<span class="text-warning">Edu</span></h4>
+            <div class="badge bg-white bg-opacity-10 text-warning px-3 py-1 rounded-pill mt-2" style="font-size: 0.6rem; display: block; margin: 0 auto; width: fit-content;">v18.0 CORE</div>
+        </div>
+        <nav class="mt-5">
+            <a class="nav-link-pe active" id="btn-dash" onclick="window.showTab('sec-dash')"><i class="fas fa-chart-line"></i> Dashboard</a>
+            <a class="nav-link-pe" id="btn-acervo" onclick="window.showTab('sec-acervo')"><i class="fas fa-book"></i> Acervo Digital</a>
+            <a class="nav-link-pe" id="btn-turmas" onclick="window.showTab('sec-turmas')"><i class="fas fa-users-class"></i> Gestão Alunos</a>
+            <a class="nav-link-pe" id="btn-atrasos" onclick="window.showTab('sec-atrasos')"><i class="fas fa-calendar-exclamation text-warning"></i> Pendências</a>
+            <hr class="opacity-10 my-5">
+            <a class="nav-link-pe text-success" data-bs-toggle="modal" data-bs-target="#modalImportar"><i class="fas fa-file-import"></i> Importar Excel</a>
+            <a href="#" id="btnVoltar" class="nav-link-pe text-white-50 mt-5"><i class="fas fa-arrow-left"></i> Voltar</a>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <div class="d-flex justify-content-between align-items-center mb-5 pb-3">
+            <div>
+                <h2 class="fw-800 text-primary m-0" style="font-size: 2.4rem; letter-spacing: -1.5px;">
+                    Acervo Digital <span class="text-secondary" id="unidadeTxt">| ...</span>
+                </h2>
+                <div id="statusContainer" class="mt-2">
+                    <span id="statusBadge" class="badge rounded-pill bg-warning-subtle text-warning px-3 py-2" style="font-size: 0.7rem;">
+                        <i class="fas fa-sync fa-spin me-1"></i> SINCRONIZANDO NÚCLEO...
+                    </span>
+                </div>
+            </div>
+            <button class="btn-infinity" style="width: auto; padding: 18px 45px;" data-bs-toggle="modal" data-bs-target="#modalEmprestimo" onclick="window.prepararModalNovoEmprestimo()">
+                <i class="fas fa-plus-circle me-2"></i> REGISTRAR SAÍDA
+            </button>
+        </div>
+
+        <div id="sec-dash" class="content-section section-active">
+            <div class="row g-4 mb-5">
+                <div class="col-md-4"><div class="stat-card" style="background: linear-gradient(135deg, #001a4d 0%, #003399 100%);"><h6>ACERVO TOTAL</h6><h1 id="st-total">0</h1></div></div>
+                <div class="col-md-4"><div class="stat-card" style="background: #ffffff; color: var(--primary); border: 1px solid #e2e8f0;"><h6>EM USO</h6><h1 id="st-ativos" class="text-secondary">0</h1></div></div>
+                <div class="col-md-4"><div class="stat-card" style="background: linear-gradient(135deg, #991b1b 0%, #ef4444 100%);"><h6>ATRASADOS</h6><h1 id="st-atrasos">0</h1></div></div>
+            </div>
+            <div class="card-lux"><h5 class="fw-bold text-primary mb-4">Saídas Recentes</h5><table class="table table-elite"><tbody id="listaRecentes"></tbody></table></div>
+        </div>
+
+        <div id="sec-acervo" class="content-section">
+            <div class="card-lux">
+                <div class="d-flex justify-content-between mb-5 align-items-center">
+                    <div class="d-flex align-items-center gap-3">
+                        <h4 class="fw-bold m-0">Catálogo Geral</h4>
+                        <input type="text" class="search-bar-elite" id="searchAcervo" placeholder="Buscar livro ou autor..." onkeyup="window.filterTable('listaLivrosAcervo', this.value)">
+                    </div>
+                    <button class="btn btn-dark rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#modalNovoLivro">+ NOVO LIVRO</button>
+                </div>
+                <table class="table table-elite" id="tabela-acervo"><thead><tr><th>Obra / Autor</th><th class="text-center">Estoque</th><th class="text-end">Gerenciar</th></tr></thead><tbody id="listaLivrosAcervo"></tbody></table>
+            </div>
+        </div>
+
+        <div id="sec-turmas" class="content-section">
+            <div class="mb-4 d-flex justify-content-start">
+                <input type="text" class="search-bar-elite w-100" id="searchTurmas" placeholder="Pesquisar por nome do aluno ou livro emprestado..." onkeyup="window.filterAlunosAtivos(this.value)">
+            </div>
+            <div id="container-por-turma"></div>
+        </div>
+
+        <div id="sec-atrasos" class="content-section">
+            <div class="card-lux border-start border-danger border-5">
+                <div class="d-flex justify-content-between mb-4 align-items-center">
+                    <h5 class="fw-bold text-danger m-0">Pendências (Cobrança via WhatsApp)</h5>
+                    <input type="text" class="search-bar-elite" id="searchAtrasos" placeholder="Buscar pendente..." onkeyup="window.filterTable('listaAtrasadosTab', this.value)">
+                </div>
+                <table class="table table-elite"><thead><tr><th>Estudante</th><th>Livro</th><th>Cobrar</th></tr></thead><tbody id="listaAtrasadosTab"></tbody></table>
+            </div>
+        </div>
+    </main>
+
+    <div class="modal fade" id="modalEmprestimo" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><h3 class="modal-title-lux">Registrar Saída</h3><div class="search-container"><input type="text" id="inp-alu" class="form-control-lux" placeholder="Pesquisar Aluno..." oninput="window.filtrarAlu(this.value)"><div id="res-alu" class="search-results shadow-lg"></div></div><div class="search-container mt-2"><input type="text" id="inp-liv" class="form-control-lux" placeholder="Pesquisar Livro..." oninput="window.filtrarLiv(this.value)"><div id="res-liv" class="search-results shadow-lg"></div></div><input type="date" id="inp-data" class="form-control-lux mt-2"><input type="hidden" id="sid-alu"><input type="hidden" id="sid-liv"><button id="btnConfirmarEmp" class="btn-infinity mt-3">CONFIRMAR</button></div></div></div>
+    <div class="modal fade" id="modalNovoLivro" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><h3 class="modal-title-lux">Novo Exemplar</h3><input type="text" id="n-liv-tit" class="form-control-lux" placeholder="Título da Obra"><input type="text" id="n-liv-aut" class="form-control-lux" placeholder="Autor"><input type="number" id="n-liv-qtd" class="form-control-lux" placeholder="Quantidade em Estoque"><button id="btnSalvarLivro" class="btn-infinity">CADASTRAR</button></div></div></div>
+    <div class="modal fade" id="modalEditarEmprestimo" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><h3 class="modal-title-lux">Gerenciar Prazo</h3><input type="hidden" id="edit-emp-id"><input type="text" id="edit-emp-aluno" class="form-control-lux bg-light" readonly><input type="date" id="edit-emp-data" class="form-control-lux"><button id="btnUpdateEmp" class="btn-infinity">ATUALIZAR DATA</button><button onclick="window.renovarRapido()" class="btn btn-outline-warning w-100 mt-3 border-0 fw-bold">RENOVAR +7 DIAS</button></div></div></div>
+    <div class="modal fade" id="modalImportar" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><h3 class="modal-title-lux">Importar Acervo</h3><button onclick="window.baixarModelo()" class="btn btn-outline-success w-100 py-3 mb-4 rounded-4 fw-bold">BAIXAR PLANILHA MODELO</button><div class="import-drop-zone p-5 text-center rounded-5 bg-light" style="border: 2px dashed #ccc" onclick="document.getElementById('file-excel').click()"><i class="fas fa-file-excel fa-4x text-success mb-3"></i><p>Selecione o arquivo extraído</p><input type="file" id="file-excel" class="d-none" accept=".xlsx, .xls"></div><button id="btnProcessarExcel" class="btn-infinity mt-4">IMPORTAR AGORA</button></div></div></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, query, where, increment, getDoc, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        
+        const firebaseConfig = { apiKey: "AIzaSyDgR98RtL8sgxVbEV2Swyb2wnHLSPt3cDo", authDomain: "escolapro-15e5e.firebaseapp.com", projectId: "escolapro-15e5e", storageBucket: "escolapro-15e5e.firebasestorage.app", messagingSenderId: "339019791514", appId: "1:339019791514:web:44e0d58b6835f0fe6df323" };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        let logado = JSON.parse(localStorage.getItem('usuarioLogado'));
+        let cacheAlunos = [], cacheLivros = [];
+
+        onAuthStateChanged(auth, user => { 
+            if(user && logado) { 
+                document.getElementById('unidadeTxt').innerText = "| " + logado.escolaId.toUpperCase();
+                const badge = document.getElementById('statusBadge');
+                badge.classList.remove('bg-warning-subtle', 'text-warning');
+                badge.classList.add('bg-success-subtle', 'text-success');
+                badge.innerHTML = '<i class="fas fa-shield-check me-1"></i> SISTEMA OPERACIONAL & SINCRONIZADO';
+
+                const btnVoltar = document.getElementById('btnVoltar');
+                if(logado.tipo === 'biblioteca') {
+                    btnVoltar.innerHTML = '<i class="fas fa-power-off"></i> Encerrar Sessão';
+                    btnVoltar.onclick = window.logout;
+                } else {
+                    btnVoltar.href = 'dashboard.html';
+                }
+                initApp(); 
+            } else { window.location.href = "index.html"; } 
+        });
+
+        window.logout = async () => { await signOut(auth); localStorage.clear(); window.location.href = 'index.html'; };
+
+        window.showTab = (id) => {
+            document.querySelectorAll('.content-section').forEach(s => { s.classList.remove('section-active'); s.style.display='none'; });
+            const target = document.getElementById(id);
+            target.style.display = 'block';
+            setTimeout(() => target.classList.add('section-active'), 10);
+            document.querySelectorAll('.nav-link-pe').forEach(l => l.classList.remove('active'));
+            document.getElementById('btn-'+id.split('-')[1]).classList.add('active');
+        };
+
+        window.filterTable = (tbodyId, query) => {
+            const q = query.toLowerCase();
+            const rows = document.getElementById(tbodyId).getElementsByTagName('tr');
+            for (let row of rows) {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(q) ? '' : 'none';
+            }
+        };
+
+        window.filterAlunosAtivos = (query) => {
+            const q = query.toLowerCase();
+            const cards = document.querySelectorAll('.turma-card');
+            cards.forEach(card => {
+                const rows = card.querySelectorAll('tbody tr');
+                let hasVisibleRow = false;
+                rows.forEach(row => {
+                    const text = row.innerText.toLowerCase();
+                    if (text.includes(q)) {
+                        row.style.display = '';
+                        hasVisibleRow = true;
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+                card.style.display = hasVisibleRow ? '' : 'none';
+            });
+        };
+
+        window.filtrarAlu = (v) => {
+            const res = document.getElementById('res-alu');
+            if(v.length < 2) { res.style.display = 'none'; return; }
+            let h = "";
+            cacheAlunos.filter(a => a.nome.toLowerCase().includes(v.toLowerCase())).forEach(a => {
+                h += `<div class="search-item" onclick="window.selectAlu('${a.id}','${a.nome}','${a.sala}', '${a.tel || ''}')"><span class="item-title">${a.nome}</span><span class="item-subtitle">${a.sala}</span></div>`;
+            });
+            res.innerHTML = h; res.style.display = 'block';
+        };
+
+        window.selectAlu = (id, n, s, t) => { 
+            document.getElementById('sid-alu').value = id; 
+            document.getElementById('inp-alu').value = n + " | " + s; 
+            document.getElementById('inp-alu').dataset.tel = t; 
+            document.getElementById('res-alu').style.display = 'none'; 
+        };
+
+        window.filtrarLiv = (v) => {
+            const res = document.getElementById('res-liv');
+            if(v.length < 2) { res.style.display = 'none'; return; }
+            let h = "";
+            cacheLivros.filter(l => l.titulo.toLowerCase().includes(v.toLowerCase())).forEach(l => {
+                const disabled = l.quantidade <= 0 ? 'opacity-50' : '';
+                h += `<div class="search-item ${disabled}" onclick="${l.quantidade > 0 ? `window.selectLiv('${l.id}','${l.titulo}')` : ''}"><span><b>${l.titulo}</b></span><span class="badge bg-light text-primary">${l.quantidade} un</span></div>`;
+            });
+            res.innerHTML = h; res.style.display = 'block';
+        };
+        window.selectLiv = (id, t) => { document.getElementById('sid-liv').value = id; document.getElementById('inp-liv').value = t; document.getElementById('res-liv').style.display = 'none'; };
+
+        window.prepararModalNovoEmprestimo = () => {
+            const input = document.getElementById('inp-data');
+            const dataPadrao = new Date();
+            dataPadrao.setDate(dataPadrao.getDate() + 7);
+            input.value = dataPadrao.toISOString().split('T')[0];
+            input.min = new Date().toISOString().split('T')[0];
+        };
+
+        document.getElementById('btnSalvarLivro').onclick = async () => {
+            const t = document.getElementById('n-liv-tit').value, a = document.getElementById('n-liv-aut').value, q = parseInt(document.getElementById('n-liv-qtd').value);
+            if(!t || isNaN(q)) return;
+            await addDoc(collection(db, "livros"), { titulo: t, autor: a, quantidade: q, escolaId: logado.escolaId });
+            bootstrap.Modal.getInstance(document.getElementById('modalNovoLivro')).hide();
+            Swal.fire("Obra Catalogada", "O livro foi adicionado ao acervo.", "success");
+        };
+
+        // --- FUNÇÃO DE CONFIRMAÇÃO COM TRAVA DE BLOQUEIO ---
+        document.getElementById('btnConfirmarEmp').onclick = async () => {
+            const aid = document.getElementById('sid-alu').value, lid = document.getElementById('sid-liv').value, dat = document.getElementById('inp-data').value;
+            if(!aid || !lid || !dat) return Swal.fire("Campos incompletos", "", "warning");
+
+            try {
+                // BUSCA EMPRÉSTIMOS ATIVOS DO ALUNO
+                const qAtivos = query(collection(db, "emprestimos"), 
+                    where("alunoId", "==", aid), 
+                    where("status", "==", "Ativo"),
+                    where("escolaId", "==", logado.escolaId)
+                );
+                const snapAtivos = await getDocs(qAtivos);
+                const totalEmprestimos = snapAtivos.size;
+                
+                // VERIFICA SE HÁ LIVROS ATRASADOS
+                const agora = Date.now();
+                let temAtraso = false;
+                snapAtivos.forEach(doc => {
+                    if (agora > doc.data().timestampDev) temAtraso = true;
+                });
+
+                // REGRAS DE BLOQUEIO
+                if (temAtraso) {
+                    return Swal.fire({
+                        icon: 'error',
+                        title: 'Empréstimo Bloqueado',
+                        text: 'Este estudante possui livros em ATRASO. Ele deve devolver as pendências antes de realizar uma nova saída.',
+                        confirmButtonColor: '#d33'
+                    });
+                }
+
+                if (totalEmprestimos >= 3) {
+                    return Swal.fire({
+                        icon: 'error',
+                        title: 'Limite Atingido',
+                        text: 'Este estudante já possui 3 livros em mãos (limite máximo). Realize a baixa de algum exemplar para liberar uma nova saída.',
+                        confirmButtonColor: '#d33'
+                    });
+                }
+
+                // SE PASSAR NAS REGRAS, REGISTRA A SAÍDA
+                const infoAlu = document.getElementById('inp-alu').value.split(' | ');
+                const dataObj = new Date(dat + "T12:00:00");
+                await addDoc(collection(db, "emprestimos"), {
+                    alunoId: aid, alunoNome: infoAlu[0], alunoSala: infoAlu[1], alunoTel: document.getElementById('inp-alu').dataset.tel || "",
+                    livroId: lid, livroTitulo: document.getElementById('inp-liv').value,
+                    dataDev: dataObj.toLocaleDateString('pt-BR'), timestampDev: dataObj.getTime(),
+                    status: "Ativo", escolaId: logado.escolaId, createdAt: serverTimestamp()
+                });
+                await updateDoc(doc(db, "livros", lid), { quantidade: increment(-1) });
+                bootstrap.Modal.getInstance(document.getElementById('modalEmprestimo')).hide();
+                Swal.fire("Saída Registrada", "Empréstimo concluído com sucesso.", "success");
+
+            } catch (e) {
+                console.error(e);
+                Swal.fire("Erro no Processamento", "Não foi possível validar as regras de bloqueio.", "error");
+            }
+        };
+
+        window.abrirGestao = async (id) => {
+            const d = (await getDoc(doc(db, "emprestimos", id))).data();
+            document.getElementById('edit-emp-id').value = id;
+            document.getElementById('edit-emp-aluno').value = d.alunoNome;
+            const partes = d.dataDev.split('/');
+            document.getElementById('edit-emp-data').value = `${partes[2]}-${partes[1]}-${partes[0]}`;
+            new bootstrap.Modal(document.getElementById('modalEditarEmprestimo')).show();
+        };
+
+        document.getElementById('btnUpdateEmp').onclick = async () => {
+            const id = document.getElementById('edit-emp-id').value, dVal = document.getElementById('edit-emp-data').value;
+            const dataObj = new Date(dVal + "T12:00:00");
+            await updateDoc(doc(db, "emprestimos", id), { dataDev: dataObj.toLocaleDateString('pt-BR'), timestampDev: dataObj.getTime() });
+            bootstrap.Modal.getInstance(document.getElementById('modalEditarEmprestimo')).hide();
+            Swal.fire("Prazo Atualizado", "A nova data foi salva.", "success");
+        };
+
+        window.renovarRapido = async () => {
+            try {
+                const id = document.getElementById('edit-emp-id').value;
+                if(!id) return;
+                const snap = await getDoc(doc(db, "emprestimos", id));
+                if(!snap.exists()) return;
+                const dataAtualBanco = new Date(snap.data().timestampDev);
+                dataAtualBanco.setDate(dataAtualBanco.getDate() + 7);
+                await updateDoc(doc(db, "emprestimos", id), { 
+                    dataDev: dataAtualBanco.toLocaleDateString('pt-BR'), 
+                    timestampDev: dataAtualBanco.getTime() 
+                });
+                bootstrap.Modal.getInstance(document.getElementById('modalEditarEmprestimo')).hide();
+                Swal.fire("Prazo Renovado", "O aluno ganhou +7 dias de permanência.", "success");
+            } catch (e) {
+                Swal.fire("Erro na Renovação", "Tente novamente mais tarde.", "error");
+            }
+        };
+
+        window.darBaixa = async (eid, lid) => {
+            const res = await Swal.fire({ title: 'Confirmar Devolução?', text: 'O exemplar retornará ao estoque físico.', icon: 'question', showCancelButton: true, confirmButtonText: 'Sim, dar baixa' });
+            if(res.isConfirmed) {
+                await updateDoc(doc(db, "emprestimos", eid), { status: 'Devolvido' });
+                await updateDoc(doc(db, "livros", lid), { quantidade: increment(1) });
+                Swal.fire("Baixa Concluída", "", "success");
+            }
+        };
+
+        window.enviarZap = (tel, n, l) => {
+            if(!tel) return Swal.fire("Dados Ausentes", "Este aluno não possui telefone de contato.", "warning");
+            const msg = window.encodeURIComponent(`Olá ${n}, lembramos da devolução do livro "${l}". Por favor, entregue na biblioteca assim que possível. ✅`);
+            window.open(`https://api.whatsapp.com/send?phone=55${tel.replace(/\D/g,'')}&text=${msg}`, '_blank');
+        };
+
+        function initApp() {
+            onSnapshot(query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId)), snap => { 
+                cacheAlunos = []; snap.forEach(d => cacheAlunos.push({id: d.id, ...d.data()})); 
+            });
+
+            onSnapshot(query(collection(db, "livros"), where("escolaId", "==", logado.escolaId)), snap => {
+                let tb = "", tot = 0; cacheLivros = [];
+                snap.forEach(d => {
+                    const b = d.data(); tot += b.quantidade; cacheLivros.push({id: d.id, ...b});
+                    tb += `<tr><td><span class="item-title">${b.titulo}</span><span class="item-subtitle">${b.autor}</span></td><td class="text-center"><span class="badge ${b.quantidade > 0 ? 'bg-light text-primary' : 'bg-danger-subtle text-danger'} rounded-pill px-3 py-2 fw-bold">${b.quantidade} UN</span></td><td class="text-end"><button class="btn btn-sm btn-light text-danger rounded-circle" onclick="deleteDoc(doc(db,'livros','${d.id}'))"><i class="fas fa-trash"></i></button></td></tr>`;
+                });
+                document.getElementById('listaLivrosAcervo').innerHTML = tb; document.getElementById('st-total').innerText = tot;
+                window.filterTable('listaLivrosAcervo', document.getElementById('searchAcervo').value);
+            });
+
+            onSnapshot(query(collection(db, "emprestimos"), where("escolaId", "==", logado.escolaId), where("status", "==", "Ativo")), snap => {
+                let rec = "", atr = "", ca = 0, cat = 0, ag = Date.now(), tMap = {};
+                snap.forEach(d => {
+                    const e = {id: d.id, ...d.data()}; const isA = ag > e.timestampDev; ca++; if(isA) cat++;
+                    const alunoAtual = cacheAlunos.find(a => a.id === e.alunoId);
+                    const telAtualizado = alunoAtual ? (alunoAtual.tel || alunoAtual.telefone || e.alunoTel) : e.alunoTel;
+                    const dias = Math.ceil((e.timestampDev - ag) / 86400000);
+                    const row = `<tr><td><span class="item-title">${e.alunoNome}</span></td><td><b>${e.livroTitulo}</b></td><td>${e.dataDev} ${isA?'<span class="badge bg-danger">ATRASADO</span>':`<span class="badge bg-light text-dark">${dias} dias</span>`}</td><td><div class="d-flex gap-2"><button class="btn btn-sm btn-success rounded-pill px-3" onclick="window.darBaixa('${e.id}','${e.livroId}')">Baixa</button><button class="btn btn-sm btn-light rounded-pill px-3" onclick="window.abrirGestao('${e.id}')">Gerenciar</button></div></td></tr>`;
+                    rec += `<tr><td><span class="item-title">${e.alunoNome}</span><span class="item-subtitle">${e.alunoSala}</span></td><td><b>${e.livroTitulo}</b></td><td>${e.dataDev}</td></tr>`;
+                    if(!tMap[e.alunoSala]) tMap[e.alunoSala] = ""; tMap[e.alunoSala] += row;
+                    if(isA) atr += `<tr><td><span class="item-title">${e.alunoNome}</span><span class="item-subtitle">${e.alunoSala}</span></td><td><b>${e.livroTitulo}</b></td><td><button class="btn btn-success btn-sm rounded-pill" onclick="window.enviarZap('${telAtualizado}','${e.alunoNome}','${e.livroTitulo}')"><i class="fab fa-whatsapp"></i></button></td></tr>`;
+                });
+                let h = ""; Object.keys(tMap).sort().forEach(t => h += `<div class="turma-card"><div class="turma-header"><i class="fas fa-graduation-cap"></i> TURMA: ${t}</div><table class="table table-elite"><tbody>${tMap[t]}</tbody></table></div>`);
+                document.getElementById('container-por-turma').innerHTML = h || '<div class="text-center p-5 opacity-50">Nenhuma saída ativa no momento.</div>';
+                document.getElementById('listaRecentes').innerHTML = rec; document.getElementById('listaAtrasadosTab').innerHTML = atr || '<tr><td colspan="3" class="text-center p-4">Excelente! Nenhuma pendência hoje.</td></tr>';
+                document.getElementById('st-ativos').innerText = ca; document.getElementById('st-atrasos').innerText = cat;
+                window.filterAlunosAtivos(document.getElementById('searchTurmas').value);
+                window.filterTable('listaAtrasadosTab', document.getElementById('searchAtrasos').value);
+            });
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

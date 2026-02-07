@@ -6,7 +6,6 @@
     <title>AcessaEdu | Master Elite Hub</title>
 
     <link rel="icon" type="image/png" href="Icone_acessaedu.ico">
-    
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -14,337 +13,483 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        :root { --primary: #003399; --accent: #ffcc00; --bg-body: #f8fafc; --sidebar-w: 280px; }
+        :root { 
+            --primary: #001a4d; 
+            --secondary: #003399;
+            --accent: #ffcc00; 
+            --bg-body: #f0f2f5; 
+            --sidebar-w: 280px; 
+            --glass: rgba(255, 255, 255, 0.9);
+        }
+        
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--bg-body); color: #1e293b; margin: 0; }
 
-        .sidebar { width: var(--sidebar-w); background: linear-gradient(180deg, #001a4d 0%, #003399 100%); height: 100vh; position: fixed; padding: 30px 20px; color: white; z-index: 1000; box-shadow: 10px 0 30px rgba(0,0,0,0.05); display: flex; flex-direction: column; }
-        .nav-link-pe { color: rgba(255,255,255,0.7); padding: 14px 18px; border-radius: 16px; display: flex; align-items: center; gap: 15px; margin-bottom: 10px; transition: 0.3s; text-decoration: none; font-weight: 500; }
-        .nav-link-pe:hover, .nav-link-pe.active { background: rgba(255,255,255,0.15); color: var(--accent); transform: translateX(5px); }
-        .nav-link-pe.active { background: var(--accent); color: var(--primary); font-weight: 700; }
-
-        .main-content { margin-left: var(--sidebar-w); padding: 40px; min-height: 100vh; }
-        .card-premium { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.5); border-radius: 24px; padding: 30px; box-shadow: 0 15px 35px rgba(0,0,0,0.03); margin-bottom: 30px; }
-        
-        .stat-box { padding: 25px; border-radius: 24px; color: white; position: relative; overflow: hidden; box-shadow: 0 15px 30px rgba(0,0,0,0.1); }
-        .stat-box i { position: absolute; right: -10px; bottom: -10px; font-size: 5rem; opacity: 0.15; transform: rotate(-15deg); }
-
-        .secao { display: none; }
-        .ativa { display: block; animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
-
-        .user-item { background: #f8fafc; border-radius: 15px; padding: 15px; margin-bottom: 10px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
-
-        .modal-content { border-radius: 30px; border: none; }
-        .nav-pills .nav-link { color: var(--primary); font-weight: 600; border-radius: 12px; padding: 10px 20px; }
-        .nav-pills .nav-link.active { background-color: var(--primary); color: white; }
-        .form-label-bold { font-weight: 700; font-size: 0.85rem; color: var(--primary); margin-bottom: 5px; display: block; }
-
-        /* --- ESTILO PARA ÁREA DE IMPRESSÃO COMPACTO (1 PÁGINA) --- */
-        #print-area { display: none; background: white; color: black; padding: 20px 40px; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.35; }
-        #print-area p { text-align: justify; margin-bottom: 6px; }
-        .print-header-logos { display: flex; justify-content: center; align-items: center; gap: 40px; margin-bottom: 15px; }
-        .print-header-logos img { height: 75px; width: auto; max-width: 180px; object-fit: contain; }
-
-        @media print {
-            @page { size: A4; margin: 10mm; }
-            body * { visibility: hidden; }
-            #print-area, #print-area * { visibility: visible; }
-            #print-area { display: block !important; position: absolute; left: 0; top: 0; width: 100%; border: none; }
+        /* --- SIDEBAR LUX --- */
+        .sidebar { 
+            width: var(--sidebar-w); 
+            background: var(--primary); 
+            height: 100vh; 
+            position: fixed; 
+            padding: 30px 20px; 
+            color: white; 
+            z-index: 1000; 
+            box-shadow: 10px 0 30px rgba(0,0,0,0.1); 
+            display: flex; 
+            flex-direction: column; 
         }
+        
+        .nav-link-pe { 
+            color: rgba(255,255,255,0.6); 
+            padding: 15px 20px; 
+            border-radius: 20px; 
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+            margin-bottom: 8px; 
+            transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1); 
+            text-decoration: none; 
+            font-weight: 600; 
+        }
+        
+        .nav-link-pe:hover { background: rgba(255,255,255,0.05); color: white; transform: translateX(5px); }
+        .nav-link-pe.active { background: var(--accent); color: var(--primary); font-weight: 800; box-shadow: 0 10px 20px rgba(255, 204, 0, 0.2); }
+
+        /* --- MAIN CONTENT --- */
+        .main-content { margin-left: var(--sidebar-w); padding: 50px; min-height: 100vh; }
+        
+        .card-premium { 
+            background: var(--glass); 
+            backdrop-filter: blur(10px); 
+            border-radius: 30px; 
+            padding: 35px; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.03); 
+            margin-bottom: 30px; 
+            border: 1px solid rgba(255,255,255,0.8);
+        }
+        
+        .stat-box { 
+            padding: 30px; 
+            border-radius: 30px; 
+            color: white; 
+            position: relative; 
+            overflow: hidden; 
+            transition: 0.4s;
+            border: none;
+        }
+        .stat-box:hover { transform: translateY(-10px); box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
+        .stat-box i { position: absolute; right: -10px; bottom: -10px; font-size: 6rem; opacity: 0.2; transform: rotate(-15deg); }
+
+        .secao { display: none; opacity: 0; transform: translateY(20px); transition: 0.5s ease-out; }
+        .ativa { display: block; opacity: 1; transform: translateY(0); }
+
+        .form-control-lux { 
+            background: #f8fafc; 
+            border: 2px solid #e2e8f0; 
+            border-radius: 18px; 
+            padding: 12px 20px; 
+            font-weight: 600; 
+            transition: 0.3s; 
+        }
+        .form-control-lux:focus { border-color: var(--secondary); box-shadow: 0 0 0 4px rgba(0,51,153,0.05); outline: none; }
+
+        .btn-master { 
+            background: var(--secondary); 
+            color: white; 
+            border-radius: 18px; 
+            padding: 14px 25px; 
+            font-weight: 800; 
+            border: none; 
+            transition: 0.3s; 
+        }
+        .btn-master:hover { background: var(--primary); transform: scale(1.02); }
+
+        .user-item { 
+            background: white; 
+            border-radius: 20px; 
+            padding: 20px; 
+            margin-bottom: 12px; 
+            border: 1px solid #edf2f7; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.01);
+        }
+
+        .school-check-item { background: white; border-radius: 15px; padding: 12px 20px; border: 1px solid #edf2f7; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: 0.2s; }
+        .school-check-item:hover { border-color: var(--secondary); background: #f0f7ff; }
+
+        .monitor-item { background: #fffbeb; border-left: 5px solid var(--accent); padding: 15px; border-radius: 15px; margin-bottom: 10px; font-size: 0.85rem; }
     </style>
 </head>
 <body>
 
     <aside class="sidebar">
         <div class="text-center mb-5">
-            <img src="logo_acessaedu.png" height="70" class="mb-3">
+            <img src="logo_acessaedu.png" height="80" class="mb-3">
             <h5 class="fw-bold text-white mb-0">Acessa <span class="text-warning">Edu</span></h5>
-            <small class="opacity-50">Controle Global v4.0</small>
+            <div class="badge bg-warning bg-opacity-10 text-warning px-3 py-1 rounded-pill mt-2" style="font-size: 0.6rem;">ADMIN MASTER HUB</div>
         </div>
         <nav>
-            <a href="#" class="nav-link-pe active" onclick="window.trocarAba('sec-resumo', this)"><i class="fas fa-chart-pie"></i> Visão Geral</a>
-            <a href="#" class="nav-link-pe" onclick="window.trocarAba('sec-unidades', this)"><i class="fas fa-university"></i> Unidades Contratantes</a>
-            <a href="#" class="nav-link-pe" onclick="window.trocarAba('sec-termo', this)"><i class="fas fa-file-contract"></i> Gerar Termo Consentimento</a>
-            <a href="#" class="nav-link-pe" onclick="window.trocarAba('sec-logs', this)"><i class="fas fa-list-ul"></i> Logs do Sistema</a>
+            <a href="#" class="nav-link-pe active" onclick="window.trocarAba('sec-resumo', this)"><i class="fas fa-chart-line"></i> Lucratividade</a>
+            <a href="#" class="nav-link-pe" onclick="window.trocarAba('sec-unidades', this)"><i class="fas fa-school"></i> Gestão de Escolas</a>
+            <a href="#" class="nav-link-pe" onclick="window.trocarAba('sec-broadcast', this)"><i class="fas fa-bullhorn text-warning"></i> Broadcast Direcionado</a>
+            <a href="#" class="nav-link-pe" onclick="window.trocarAba('sec-logs', this)"><i class="fas fa-shield-alt"></i> Auditoria Global</a>
         </nav>
         <div class="mt-auto">
-            <button class="btn btn-danger w-100 rounded-4 py-3 fw-bold" onclick="window.logoutMaster()"><i class="fas fa-power-off me-2"></i>SAIR</button>
+            <button class="btn btn-outline-danger w-100 rounded-4 py-3 fw-bold" onclick="window.logoutMaster()"><i class="fas fa-power-off me-2"></i>SAIR</button>
         </div>
     </aside>
 
     <main class="main-content">
         <div class="d-flex justify-content-between align-items-center mb-5">
-            <div><h3 class="fw-bold mb-1">Olá, Gabriel</h3><p class="text-muted mb-0">Gerencie suas licenças e acessos SaaS.</p></div>
-            <div class="bg-white p-2 px-3 rounded-4 shadow-sm fw-bold"><i class="fas fa-crown text-warning me-2"></i>Administrador Master</div>
+            <div>
+                <h3 class="fw-800 mb-1">Painel Master Hub</h3>
+                <p class="text-muted mb-0">Bem-vindo, Gabriel. Gerencie seu ecossistema SaaS.</p>
+            </div>
+            <div class="bg-white p-3 px-4 rounded-pill shadow-sm fw-bold border"><i class="fas fa-gem text-warning me-2"></i>Licença Vitalícia</div>
         </div>
 
         <div id="sec-resumo" class="secao ativa">
             <div class="row g-4 mb-5">
-                <div class="col-md-4"><div class="stat-box" style="background: linear-gradient(135deg, #4f46e5, #3730a3);"> <small>INSTITUIÇÕES</small><h1 id="dash-escolas">0</h1><i class="fas fa-school"></i></div></div>
-                <div class="col-md-4"><div class="stat-box" style="background: linear-gradient(135deg, #10b981, #059669);"> <small>ALUNOS GLOBAIS</small><h1 id="dash-alunos">0</h1><i class="fas fa-user-graduate"></i></div></div>
-                <div class="col-md-4"><div class="stat-box" style="background: linear-gradient(135deg, #ef4444, #dc2626);"> <small>BLOQUEADAS</small><h1 id="dash-bloq">0</h1><i class="fas fa-lock"></i></div></div>
+                <div class="col-md-4"><div class="stat-box" style="background: linear-gradient(135deg, #003399 0%, #001a4d 100%);"> <small class="fw-bold opacity-75">FATURAMENTO MENSAL (MRR)</small><h1 id="dash-mrr" class="fw-bold mt-2">R$ 0,00</h1><i class="fas fa-wallet"></i></div></div>
+                <div class="col-md-4"><div class="stat-box" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);"> <small class="fw-bold opacity-75">ESCOLAS ATIVAS</small><h1 id="dash-escolas" class="fw-bold mt-2">0</h1><i class="fas fa-university"></i></div></div>
+                <div class="col-md-4"><div class="stat-box" style="background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);"> <small class="fw-bold opacity-75">ALUNOS TOTAIS</small><h1 id="dash-alunos" class="fw-bold mt-2">0</h1><i class="fas fa-user-graduate"></i></div></div>
+            </div>
+            <div class="card-premium">
+                <h5 class="fw-bold mb-4 text-primary">Análise de Receita por Instituição</h5>
+                <canvas id="chartLucro" height="100"></canvas>
+            </div>
+        </div>
+
+        <div id="sec-broadcast" class="secao">
+            <div class="row g-4">
+                <div class="col-md-5">
+                    <div class="card-premium h-100">
+                        <h5 class="fw-bold mb-3">1. Selecionar Escolas</h5>
+                        <div class="mb-3 d-flex gap-2">
+                            <button class="btn btn-sm btn-light border flex-grow-1" onclick="window.selecionarTodasEscolas(true)">Marcar Todas</button>
+                            <button class="btn btn-sm btn-light border flex-grow-1" onclick="window.selecionarTodasEscolas(false)">Limpar</button>
+                        </div>
+                        <div id="listaEscolasBroadcast" style="max-height: 250px; overflow-y: auto;"></div>
+                        <h5 class="fw-bold mb-3 mt-4">2. Mensagem</h5>
+                        <textarea id="msgBroadcast" class="form-control form-control-lux mb-4" rows="4" placeholder="O que deseja comunicar?"></textarea>
+                        <button id="btnPublicar" class="btn btn-master w-100 py-3 mb-3" onclick="window.enviarBroadcastDirecionado()">PUBLICAR COMUNICADO</button>
+                    </div>
+                </div>
+                <div class="col-md-7">
+                    <div class="card-premium h-100">
+                        <h5 class="fw-bold mb-3">Anúncios Ativos no Momento</h5>
+                        <div id="monitorAnuncios" style="max-height: 400px; overflow-y: auto;"></div>
+                        <button class="btn btn-outline-danger w-100 mt-3" onclick="window.limparTodosAvisos()">REMOVER TUDO DO AR</button>
+                    </div>
+                </div>
             </div>
         </div>
 
         <div id="sec-unidades" class="secao">
             <div class="card-premium">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h5 class="fw-bold m-0 text-primary">Unidades Contratantes</h5>
-                    <button class="btn btn-primary rounded-4 fw-bold px-4" data-bs-toggle="modal" data-bs-target="#modalNovoCadastro">+ NOVA UNIDADE</button>
+                    <h5 class="fw-bold m-0 text-primary">Gestão de Unidades e Licenças</h5>
+                    <button class="btn btn-master rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#modalNovoCadastro" onclick="window.resetModal()">+ NOVA ESCOLA</button>
                 </div>
                 <div class="table-responsive">
-                    <table class="table align-middle">
-                        <thead class="bg-light">
-                            <tr>
-                                <th class="ps-4">INSTITUIÇÃO</th>
-                                <th>DATABASE</th>
-                                <th>COTA</th>
-                                <th>STATUS</th>
-                                <th class="text-end pe-4">AÇÕES</th>
-                            </tr>
-                        </thead>
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light"><tr><th class="ps-4">INSTITUIÇÃO</th><th>PLANO</th><th>MENSALIDADE</th><th>VENCIMENTO</th><th>STATUS</th><th class="text-end pe-4">AÇÕES</th></tr></thead>
                         <tbody id="tabelaEscolas"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div id="sec-termo" class="secao">
-            <div class="card-premium text-center">
-                <h5 class="fw-bold mb-4">Gerador de Documento (LGPD)</h5>
-                <p class="text-muted">Selecione a escola para gerar o termo personalizado.</p>
-                <div class="d-flex justify-content-center gap-3">
-                    <select id="selEscolaTermo" class="form-select w-50 rounded-4 border-light shadow-sm py-2"></select>
-                    <button class="btn btn-primary rounded-4 px-4 fw-bold" onclick="window.gerarPreviewTermo()">GERAR TERMO</button>
-                </div>
-            </div>
-            <div id="card-preview-termo" class="card-premium d-none text-center">
-                <button class="btn btn-success px-5 py-3 rounded-4 fw-bold shadow-sm" onclick="window.print()">
-                    <i class="fas fa-print me-2"></i>IMPRIMIR TERMO COMPLETO
-                </button>
-            </div>
-        </div>
-
-        <div id="sec-logs" class="secao">
-            <div class="card-premium">
-                <h5 class="fw-bold mb-4">Auditoria Global</h5>
-                <div class="table-responsive">
-                    <table class="table align-middle">
-                        <thead class="table-light"><tr><th>Data</th><th>Escola</th><th>Ação</th><th>Detalhes</th></tr></thead>
-                        <tbody id="tabelaLogsGlobal"></tbody>
                     </table>
                 </div>
             </div>
         </div>
     </main>
 
-    <div id="print-area">
-        <div class="print-header-logos">
-            <img id="print-logo-acessa" src="logo_acessaedu.png">
-            <img id="print-logo-escola" src="">
-        </div>
-        <h4 class="text-center fw-bold mb-1">TERMO DE CONSENTIMENTO E AUTORIZAÇÃO DE USO DE TECNOLOGIA ESCOLAR</h4>
-        <p>Prezados Pais e Responsáveis,</p>
-        <p>Visando modernizar nossa gestão e elevar o nível de segurança, a instituição <b><span id="print-nome-escola">...</span></b>, inscrita sob o <b>CNPJ: <span id="print-cnpj-escola">...</span></b>, em parceria com a plataforma tecnológica <b>ACESSAEDU</b>, de <b>FLÁVIO GABRIEL SANTOS CLEMENTINO DA SILVA (CPF 155.256.044-93)</b>, implementou o Sistema de Frequência Inteligente. Este serviço é oferecido de forma <b>totalmente gratuita aos responsáveis</b> para proteção do menor e comunicação em tempo real.</p>
-        <p><b>1. FINALIDADE E SEGURANÇA:</b> O tratamento visa o <b>melhor interesse do menor</b>, garantindo sua segurança física e tranquilidade dos responsáveis via WhatsApp. Esclarecemos que a face é convertida em um código matemático criptografado. <b>A imagem original NÃO é armazenada</b> em banco de dados.</p>
-        <p><b>2. PROTEÇÃO E PRIVACIDADE:</b> Os dados estão protegidos nos servidores da <b>Google (Firebase)</b> que utiliza tecnologia de ponta onde a biometria facial é convertida <b>instantaneamente</b> em um <b>Hash Criptografado (código matemático unidirecional).</b>. Esclarecemos que <b>A IMAGEM DO ESTUDANTE ORIGINAL NÃO É ARMAZENADA</b> em banco de dados, sendo tecnicamente impossível a reconstituição da foto do estudante através dos dados salvos. Fica também <b>proibido</b> o compartilhamento destas informações com terceiros para fins comerciais.</p>
-        <p><b>3. DIREITOS E REVOGAÇÃO:</b> Conforme o Art. 18 da LGPD, o responsável pode, a qualquer momento e sem custos, solicitar a correção ou a <b>exclusão definitiva</b> dos dados.</p>
-        <p><b>4. VIGÊNCIA:</b> Este termo é válido durante o vínculo de matrícula, sendo os dados eliminados após o encerramento do contrato escolar.</p>
-        <div style="margin-top: 15px; border: 1px solid #000; padding: 15px;">
-            <p><b>DADOS DO ESTUDANTE:</b><br>Nome: __________________________________________________ Turma: ____________</p>
-            <p><b>DADOS DO RESPONSÁVEL:</b><br>Nome: __________________________________________________ CPF: ____________________<br>WhatsApp para Alertas: (____) _________________________</p>
-        </div>
-        <div class="mt-4 text-center"><p>Local e Data: ________________________________, ____/____/2026</p><br><p>_______________________________________________________<br>Assinatura do Responsável Legal</p></div>
-    </div>
-
     <div class="modal fade" id="modalNovoCadastro" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content shadow-lg">
-                <div class="modal-header border-0 p-4">
-                    <h5 class="fw-bold m-0 text-primary">Cadastrar Nova Unidade</h5>
-                    <button class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body p-4 pt-0">
-                    <div class="row g-3">
-                        <div class="col-md-4"><label class="form-label-bold">ID Database</label><input type="text" id="nID" class="form-control" placeholder="ex: ete_mac"></div>
-                        <div class="col-md-8"><label class="form-label-bold">Nome da Instituição</label><input type="text" id="nNome" class="form-control"></div>
-                        <div class="col-md-4"><label class="form-label-bold">CNPJ da Escola</label><input type="text" id="nCNPJ" class="form-control" placeholder="00.000.000/0000-00"></div>
-                        <div class="col-md-8"><label class="form-label-bold">Link Logo da Escola (Drive/URL)</label><input type="text" id="nLogo" class="form-control"></div>
-                        <div class="col-md-12"><label class="form-label-bold">Link Logo AcessaEdu (Editável)</label><input type="text" id="nLogoAcessa" class="form-control" value="logo_acessaedu.png"></div>
-                        <div class="col-md-4"><label class="form-label-bold">Cota de Alunos</label><input type="number" id="nLimite" class="form-control" value="50"></div>
-                        <div class="col-md-8"><label class="form-label-bold">Turmas (Separe por vírgula)</label><input type="text" id="nTurmas" class="form-control" placeholder="1º ADM, 2º REDES"></div>
-                        <div class="col-12"><hr></div>
-                        <div class="col-md-6"><label class="form-label-bold">E-mail Diretor</label><input type="email" id="nEmail" class="form-control"></div>
-                        <div class="col-md-6"><label class="form-label-bold">Senha Diretor</label><input type="password" id="nSenha" class="form-control"></div>
+            <div class="modal-content shadow-lg p-4 border-0">
+                <h4 class="fw-bold text-primary mb-4 text-center">Ativar/Editar Unidade SaaS</h4>
+                <div class="row g-3">
+                    <div class="col-md-4"><label class="small fw-bold">ID DATABASE</label><input type="text" id="nID" class="form-control form-control-lux"></div>
+                    <div class="col-md-8"><label class="small fw-bold">NOME DA ESCOLA</label><input type="text" id="nNome" class="form-control form-control-lux"></div>
+                    
+                    <div class="col-md-6">
+                        <div class="p-3 bg-light rounded-4 border">
+                            <label class="small fw-bold mb-2">PROPOSTA COMERCIAL</label>
+                            <select id="nPlanoNome" class="form-select mb-3 form-control-lux" onchange="window.recalcularTotal()">
+                                <option value="Plano Bronze">Plano Bronze</option>
+                                <option value="Plano Prata">Plano Prata</option>
+                                <option value="Plano Ouro">Plano Ouro</option>
+                                <option value="Personalizado">Personalizado</option>
+                            </select>
+                            <label class="small fw-bold">MANUTENÇÃO BASE (R$)</label>
+                            <input type="number" id="nTaxaManut" class="form-control form-control-lux" value="100" oninput="window.recalcularTotal()">
+                        </div>
                     </div>
+                    
+                    <div class="col-md-6">
+                        <div class="p-3 bg-light rounded-4 border">
+                            <label class="small fw-bold mb-2">MÓDULOS E ACESSOS</label>
+                            <div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="checkBib" onchange="window.recalcularTotal()"> <label class="form-check-label small">Biblioteca (+ R$ 50,00)</label></div>
+                            <div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="checkMsg" onchange="window.recalcularTotal()"> <label class="form-check-label small">Mensagens (0,40 p/ aluno)</label></div>
+                            <div class="mt-2 p-2 bg-white rounded-3 border text-center">
+                                <small class="text-muted">Total Sugerido: <span id="txtTotalCalc">R$ 0,00</span></small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="small fw-bold">TURMAS (SEPARE POR VÍRGULA)</label>
+                        <input type="text" id="nTurmas" class="form-control form-control-lux" placeholder="Ex: 1º Ano A, 2º Ano B, 3º Ano C">
+                    </div>
+
+                    <div class="col-md-3"><label class="small fw-bold">COTA ALUNOS</label><input type="number" id="nLimite" class="form-control form-control-lux" value="100" oninput="window.recalcularTotal()"></div>
+                    <div class="col-md-3"><label class="small fw-bold text-primary">VALOR FINAL R$</label><input type="number" id="nValor" class="form-control form-control-lux"></div>
+                    <div class="col-md-2"><label class="small fw-bold">DIA VENC.</label><input type="number" id="nVenc" class="form-control form-control-lux" value="10"></div>
+                    <div class="col-md-2"><label class="small fw-bold">MÊS</label><input type="number" id="nVencMes" class="form-control form-control-lux"></div>
+                    <div class="col-md-2"><label class="small fw-bold">ANO</label><input type="number" id="nVencAno" class="form-control form-control-lux"></div>
+                    
+                    <div class="col-12"><hr></div>
+                    <div class="col-md-6"><label class="small fw-bold">E-MAIL DIRETOR (NOVO ACESSO)</label><input type="email" id="nEmail" class="form-control form-control-lux"></div>
+                    <div class="col-md-6"><label class="small fw-bold">SENHA</label><input type="password" id="nSenha" class="form-control form-control-lux"></div>
+                    
+                    <div class="col-12 mt-4"><button class="btn btn-master w-100 py-3" onclick="window.executarCadastroCompleto()">SALVAR UNIDADE</button></div>
                 </div>
-                <div class="modal-footer border-0 p-4"><button class="btn btn-primary rounded-3 fw-bold px-5" onclick="window.executarCadastroCompleto()">CADASTRAR UNIDADE</button></div>
             </div>
         </div>
     </div>
 
     <div class="modal fade" id="modalEscola" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content shadow-lg">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="fw-bold" id="modalEscolaTitulo">Gerenciar Unidade</h5>
-                    <button class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content p-4 border-0 shadow-lg">
+                <h4 class="fw-bold mb-4 text-primary">Operadores da Unidade</h4>
+                <div id="listaUsuariosEscola" class="mb-4"></div>
+                <div class="bg-light p-3 rounded-4 border">
+                    <h6 class="fw-bold mb-3">Novo Operador</h6>
+                    <input type="email" id="newUserEmail" class="form-control form-control-lux mb-2" placeholder="E-mail">
+                    <input type="password" id="newUserPass" class="form-control form-control-lux mb-2" placeholder="Senha">
+                    <select id="newUserTipo" class="form-select form-control-lux mb-3"><option value="admin">Admin</option><option value="biblioteca">Biblioteca</option><option value="ambos">Ambos</option></select>
+                    <button class="btn btn-primary w-100" onclick="window.criarNovoUsuario()">CRIAR ACESSO</button>
                 </div>
-                <div class="modal-body p-4">
-                    <ul class="nav nav-pills mb-4" id="pills-tab" role="tablist">
-                        <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-geral">Geral</button></li>
-                        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-acessos">Acessos</button></li>
-                        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-cotas">Cotas</button></li>
-                        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-api">API</button></li>
-                    </ul>
-                    <div class="tab-content">
-                        <div class="tab-pane fade show active" id="tab-geral">
-                            <div class="row g-3">
-                                <div class="col-md-4"><label class="small fw-bold">ID Database</label><input type="text" id="editID" class="form-control bg-light" readonly></div>
-                                <div class="col-md-8"><label class="small fw-bold">Nome</label><input type="text" id="editNome" class="form-control"></div>
-                                <div class="col-md-6"><label class="small fw-bold">CNPJ</label><input type="text" id="editCNPJ" class="form-control"></div>
-                                <div class="col-md-6"><label class="small fw-bold">Logo Escola (Link)</label><input type="text" id="editLogo" class="form-control"></div>
-                                <div class="col-12"><label class="small fw-bold">Logo AcessaEdu (Link)</label><input type="text" id="editLogoAcessa" class="form-control"></div>
-                                <div class="col-12 text-end mt-3"><button class="btn btn-primary rounded-3" onclick="window.salvarConfigGeral()">Atualizar Dados</button></div>
-                            </div>
-                        </div>
-                        <div class="tab-pane fade" id="tab-acessos"><div id="listaUsuariosEscola" class="mb-4"></div><div class="bg-light p-3 rounded-4 border"><small class="fw-bold d-block mb-2 text-primary">ADICIONAR DIRETOR</small><div class="row g-2"><div class="col-md-5"><input type="email" id="newUserEmail" class="form-control" placeholder="E-mail"></div><div class="col-md-4"><input type="password" id="newUserPass" class="form-control" placeholder="Senha"></div><div class="col-md-3"><button class="btn btn-primary w-100" onclick="window.criarNovoUsuario()">CRIAR</button></div></div></div></div>
-                        <div class="tab-pane fade" id="tab-cotas"><div class="row g-3"><div class="col-md-4"><label class="small fw-bold">Cota</label><input type="number" id="editLimite" class="form-control"></div><div class="col-md-8"><label class="small fw-bold">Turmas</label><input type="text" id="editTurmas" class="form-control"></div><div class="col-12 text-end mt-3"><button class="btn btn-primary rounded-3" onclick="window.salvarConfigGeral()">Salvar</button></div></div></div>
-                        <div class="tab-pane fade" id="tab-api"><div class="row g-3"><div class="col-md-6"><input type="text" id="editZInst" class="form-control" placeholder="Instance ID"></div><div class="col-md-6"><input type="text" id="editZTok" class="form-control" placeholder="Token"></div><div class="col-12"><input type="text" id="editZCli" class="form-control" placeholder="Client Token"></div><div class="col-12 text-end mt-3"><button class="btn btn-primary rounded-3" onclick="window.salvarConfigGeral()">Configurar</button></div></div></div>
-                    </div>
-                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalEditarOperador" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content p-4 border-0 shadow-lg">
+                <h5 class="fw-bold mb-4">Ajustar Operador</h5>
+                <input type="hidden" id="editOpOldEmail">
+                <input type="email" id="editOpEmail" class="form-control form-control-lux mb-2">
+                <input type="password" id="editOpPass" class="form-control form-control-lux mb-2">
+                <select id="editOpTipo" class="form-select form-control-lux mb-4"><option value="admin">Admin</option><option value="biblioteca">Biblioteca</option><option value="ambos">Ambos</option></select>
+                <button class="btn btn-primary w-100 py-3 rounded-4 fw-bold" onclick="window.confirmarEdicaoOperador()">SALVAR</button>
             </div>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, deleteDoc, getDocs, query, where, addDoc, serverTimestamp, orderBy, limit, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, deleteDoc, getDocs, query, where, addDoc, serverTimestamp, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
         const firebaseConfig = { apiKey: "AIzaSyDgR98RtL8sgxVbEV2Swyb2wnHLSPt3cDo", authDomain: "escolapro-15e5e.firebaseapp.com", projectId: "escolapro-15e5e", storageBucket: "escolapro-15e5e.firebasestorage.app", messagingSenderId: "339019791514", appId: "1:339019791514:web:44e0d58b6835f0fe6df323" };
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const secondaryAuth = getAuth(initializeApp(firebaseConfig, "Secondary"));
+        const secAuth = getAuth(initializeApp(firebaseConfig, "Secondary"));
 
         let escolaAtualId = "";
+        let chartLucro = null;
         let listaEscolasMemoria = [];
         const toast = (m, i = 'success') => Swal.fire({ title: m, icon: i, confirmButtonColor: '#003399' });
 
         onAuthStateChanged(auth, user => { if (!user || user.email !== "gabriel.tec.redes@gmail.com") window.location.href = 'index.html'; });
 
-        // FUNÇÃO DE CONVERSÃO ROBUSTA
-        function converterLinkDrive(url) {
-            if (!url) return "";
-            if (url.includes("drive.google.com")) {
-                let fileId = "";
-                if (url.includes("/d/")) fileId = url.split("/d/")[1].split("/")[0].split("?")[0];
-                else if (url.includes("id=")) fileId = url.split("id=")[1].split("&")[0];
-                
-                if (fileId) return `https://lh3.googleusercontent.com/d/${fileId}`;
-            }
-            return url;
-        }
-
-        window.executarCadastroCompleto = async () => {
-            const id = document.getElementById('nID').value.trim();
-            const n = document.getElementById('nNome').value.trim();
-            const em = document.getElementById('nEmail').value.trim();
-            const s = document.getElementById('nSenha').value.trim();
-            if(!id || !n || !em || s.length < 6) return toast("Preencha o obrigatório!", "warning");
-            try {
-                Swal.showLoading();
-                await createUserWithEmailAndPassword(secondaryAuth, em, s);
-                await setDoc(doc(db, "unidades", id), {
-                    escolaId: id, nome: n, status: 'Ativo', cnpj: document.getElementById('nCNPJ').value,
-                    limiteAlunos: parseInt(document.getElementById('nLimite').value),
-                    turmas: document.getElementById('nTurmas').value.split(',').map(t => t.trim()).filter(t => t !== ""),
-                    logo: document.getElementById('nLogo').value.trim(),
-                    logo_acessa: document.getElementById('nLogoAcessa').value.trim() || "logo_acessaedu.png"
-                });
-                await setDoc(doc(db, "logins", em), { email: em, senha: s, escolaId: id, usuario: em.split('@')[0] });
-                await signOut(secondaryAuth);
-                bootstrap.Modal.getInstance(document.getElementById('modalNovoCadastro')).hide();
-                toast("Cadastrado!");
-            } catch (err) { toast(err.message, "error"); }
+        // CALCULADORA
+        window.recalcularTotal = () => {
+            const manut = parseFloat(document.getElementById('nTaxaManut').value) || 0;
+            const cota = parseInt(document.getElementById('nLimite').value) || 0;
+            const bib = document.getElementById('checkBib').checked ? 50 : 0;
+            const msg = document.getElementById('checkMsg').checked ? (cota * 0.40) : 0;
+            const total = manut + bib + msg;
+            document.getElementById('txtTotalCalc').innerText = `R$ ${total.toFixed(2)}`;
+            document.getElementById('nValor').value = total.toFixed(2);
         };
 
+        // MONITORAMENTO FINANCEIRO E BROADCAST
         onSnapshot(collection(db, "unidades"), snap => {
-            const t = document.getElementById('tabelaEscolas'); t.innerHTML = "";
-            const sel = document.getElementById('selEscolaTermo'); sel.innerHTML = '<option value="">Selecione Instituição...</option>';
+            let mrr = 0; let labels = []; let values = []; let html = ""; let htmlCheck = "";
             listaEscolasMemoria = [];
             snap.forEach(d => {
-                const e = d.data(); listaEscolasMemoria.push(e);
-                sel.innerHTML += `<option value="${e.escolaId}">${e.nome}</option>`;
-                t.innerHTML += `<tr><td class="ps-4"><strong>${e.nome}</strong></td><td><code>${e.escolaId}</code></td><td>${e.limiteAlunos}</td><td><span class="badge rounded-pill ${e.status === 'Ativo' ? 'bg-success' : 'bg-danger'}">${e.status}</span></td><td class="text-end pe-4"><button class="btn btn-sm btn-light text-danger me-2" onclick="window.alterarStatus('${e.escolaId}', '${e.status}')"><i class="fas fa-lock"></i></button><button class="btn btn-sm btn-outline-primary rounded-3" onclick="window.abrirGerenciamento('${e.escolaId}')">GERENCIAR</button></td></tr>`;
+                const e = {id: d.id, ...d.data()};
+                listaEscolasMemoria.push(e);
+                const v = parseFloat(e.mensalidade || 0); mrr += v;
+                labels.push(e.nome); values.push(v);
+                
+                const dataVenc = `${e.vencimento || 10}/${e.vencMes || '--'}/${e.vencAno || '--'}`;
+                html += `<tr><td class="ps-4"><strong>${e.nome}</strong></td><td class="small">${e.plano || 'Base'}</td><td>R$ ${v.toFixed(2)}</td><td>${dataVenc}</td><td><span class="badge rounded-pill ${e.status === 'Ativo' ? 'bg-success' : 'bg-danger'}">${e.status}</span></td><td class="text-end pe-4">
+                    <button class="btn btn-sm btn-success me-1" onclick="window.renovar30Dias('${e.id}')" title="Renovar 30 dias"><i class="fas fa-calendar-check"></i></button>
+                    <button class="btn btn-sm btn-light text-primary me-1" onclick="window.abrirEdicaoEscola('${e.id}')"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-sm btn-light text-info me-1" onclick="window.abrirGerenciamento('${e.id}')"><i class="fas fa-users"></i></button>
+                    <button class="btn btn-sm btn-light text-danger" onclick="window.alterarStatus('${e.id}', '${e.status}')"><i class="fas fa-lock"></i></button>
+                </td></tr>`;
+                htmlCheck += `<div class="school-check-item"><input type="checkbox" class="school-selector" value="${e.id}"> <span>${e.nome}</span></div>`;
+
+                verificarPrazosEBloqueios(e);
             });
+            document.getElementById('dash-mrr').innerText = `R$ ${mrr.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
             document.getElementById('dash-escolas').innerText = snap.size;
+            document.getElementById('tabelaEscolas').innerHTML = html;
+            document.getElementById('listaEscolasBroadcast').innerHTML = htmlCheck;
+            updateChartLucro(labels, values);
+            window.atualizarMonitorBroadcast();
         });
 
-        window.gerarPreviewTermo = () => {
-            const id = document.getElementById('selEscolaTermo').value;
-            if(!id) return toast("Selecione uma escola!", "warning");
-            const e = listaEscolasMemoria.find(x => x.escolaId === id);
-            document.getElementById('print-nome-escola').innerText = e.nome.toUpperCase();
-            document.getElementById('print-cnpj-escola').innerText = e.cnpj || "NÃO INFORMADO";
-            
-            // Usando servidor lh3 do Google para evitar bloqueios Cross-Origin
-            document.getElementById('print-logo-acessa').src = converterLinkDrive(e.logo_acessa || "logo_acessaedu.png");
-            document.getElementById('print-logo-escola').src = converterLinkDrive(e.logo || "");
-            
-            document.getElementById('card-preview-termo').classList.remove('d-none');
-            toast("Termo pronto!");
-        };
+        // --- LÓGICA DE BLOQUEIO E AVISO AUTOMÁTICO (CORRIGIDA) ---
+        async function verificarPrazosEBloqueios(escola) {
+            if(!escola.vencimento || !escola.vencMes || !escola.vencAno) return;
+            const hoje = new Date(); hoje.setHours(0,0,0,0);
+            const dataVenc = new Date(escola.vencAno, escola.vencMes - 1, escola.vencimento);
+            dataVenc.setHours(0,0,0,0);
+            const diffTime = dataVenc - hoje;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-        window.abrirGerenciamento = async (id) => {
-            escolaAtualId = id;
-            const docSnap = await getDoc(doc(db, "unidades", id));
-            const e = docSnap.data();
-            document.getElementById('editID').value = e.escolaId;
-            document.getElementById('editNome').value = e.nome;
-            document.getElementById('editCNPJ').value = e.cnpj || "";
-            document.getElementById('editLogo').value = e.logo || "";
-            document.getElementById('editLogoAcessa').value = e.logo_acessa || "logo_acessaedu.png";
-            document.getElementById('editLimite').value = e.limiteAlunos;
-            document.getElementById('editTurmas').value = e.turmas ? e.turmas.join(", ") : "";
-            document.getElementById('editZInst').value = e.z_instance || "";
-            document.getElementById('editZTok').value = e.z_token || "";
-            document.getElementById('editZCli').value = e.z_client || "";
-            window.carregarUsuarios();
-            new bootstrap.Modal(document.getElementById('modalEscola')).show();
-        };
+            const docRef = doc(db, "unidades", escola.id, "comunicados", "master");
 
-        window.salvarConfigGeral = async () => {
-            await updateDoc(doc(db, "unidades", escolaAtualId), { 
-                nome: document.getElementById('editNome').value, cnpj: document.getElementById('editCNPJ').value, logo: document.getElementById('editLogo').value.trim(), logo_acessa: document.getElementById('editLogoAcessa').value.trim(), limiteAlunos: parseInt(document.getElementById('editLimite').value),
-                turmas: document.getElementById('editTurmas').value.split(',').map(t => t.trim()).filter(t => t !== ""),
-                z_instance: document.getElementById('editZInst').value.trim(), z_token: document.getElementById('editZTok').value.trim(), z_client: document.getElementById('editZCli').value.trim()
+            // AVISO AUTOMÁTICO: Do 5º dia antes até o atraso de 4 dias
+            if(diffDays <= 5 && diffDays > -5) {
+                let novaMsg = `🔔 ATENÇÃO: Seu vencimento é em ${diffDays} dias (${dataVenc.toLocaleDateString('pt-BR')}). Realize o pagamento para evitar bloqueios automáticos.`;
+                if(diffDays === 0) novaMsg = `🚨 HOJE É O DIA DO VENCIMENTO (${dataVenc.toLocaleDateString('pt-BR')}). Regularize para manter o sistema ativo!`;
+                if(diffDays < 0) novaMsg = `🚨 SISTEMA EM ATRASO HÁ ${Math.abs(diffDays)} DIAS. O bloqueio ocorrerá em breve!`;
+                
+                const snapMsg = await getDoc(docRef);
+                if(!snapMsg.exists() || snapMsg.data().mensagem !== novaMsg) {
+                    await setDoc(docRef, { mensagem: novaMsg, ativo: true, data: serverTimestamp() });
+                }
+            }
+
+            // TRAVA DE SEGURANÇA: 5 dias após o vencimento
+            if(diffDays <= -5 && escola.status === 'Ativo') {
+                await updateDoc(doc(db, "unidades", escola.id), { status: 'Bloqueado' });
+                await setDoc(docRef, { mensagem: `❌ BLOQUEIO: Sistema suspenso por falta de pagamento (Vencido em ${dataVenc.toLocaleDateString('pt-BR')}).`, ativo: true });
+            }
+        }
+
+        // --- BOTÃO RENOVAR 30 DIAS ---
+        window.renovar30Dias = async (id) => {
+            const res = await Swal.fire({ title: 'Confirmar Renovação?', text: "O vencimento será adiado em 30 dias.", icon: 'question', showCancelButton: true });
+            if(!res.isConfirmed) return;
+            
+            const snap = await getDoc(doc(db, "unidades", id));
+            const d = snap.data();
+            let nD = new Date(d.vencAno, d.vencMes - 1, d.vencimento);
+            nD.setMonth(nD.getMonth() + 1);
+
+            await updateDoc(doc(db, "unidades", id), {
+                vencMes: nD.getMonth() + 1,
+                vencAno: nD.getFullYear(),
+                status: 'Ativo'
             });
-            toast("Atualizado!");
+            // Limpa o aviso
+            await updateDoc(doc(db, "unidades", id, "comunicados", "master"), { ativo: false });
+            toast("Assinatura Renovada!");
         };
 
+        window.atualizarMonitorBroadcast = async () => {
+            const container = document.getElementById('monitorAnuncios'); container.innerHTML = "";
+            for(let e of listaEscolasMemoria) {
+                const snap = await getDoc(doc(db, "unidades", e.id, "comunicados", "master"));
+                if(snap.exists() && snap.data().ativo) {
+                    container.innerHTML += `<div class="monitor-item d-flex justify-content-between align-items-center"><div><strong>${e.nome.toUpperCase()}</strong><br><span class="text-muted small">"${snap.data().mensagem}"</span></div><button class="btn btn-sm btn-danger rounded-pill" onclick="window.limparAvisoUnico('${e.id}')">Parar</button></div>`;
+                }
+            }
+            if(container.innerHTML === "") container.innerHTML = "<p class='text-center text-muted'>Nenhum anúncio ativo.</p>";
+        };
+
+        window.limparAvisoUnico = async id => { await updateDoc(doc(db, "unidades", id, "comunicados", "master"), { ativo: false }); window.atualizarMonitorBroadcast(); };
+        window.selecionarTodasEscolas = (s) => document.querySelectorAll('.school-selector').forEach(c => c.checked = s);
+        window.enviarBroadcastDirecionado = async () => {
+            const m = document.getElementById('msgBroadcast').value;
+            const sel = Array.from(document.querySelectorAll('.school-selector:checked')).map(c => c.value);
+            if(!m || sel.length === 0) return toast("Selecione e escreva!", "warning");
+            for(let id of sel) await setDoc(doc(db, "unidades", id, "comunicados", "master"), { mensagem: m, ativo: true, data: serverTimestamp() });
+            toast("Broadcast Enviado!"); document.getElementById('msgBroadcast').value = "";
+        };
+
+        window.limparTodosAvisos = async () => {
+            for(let e of listaEscolasMemoria) await updateDoc(doc(db, "unidades", e.id, "comunicados", "master"), { ativo: false });
+            toast("Limpado!");
+        };
+
+        window.resetModal = () => {
+            document.getElementById('nID').value = ""; document.getElementById('nID').readOnly = false;
+            document.getElementById('nNome').value = ""; document.getElementById('nTurmas').value = "";
+            window.recalcularTotal();
+        };
+
+        window.abrirEdicaoEscola = async (id) => {
+            escolaAtualId = id;
+            const e = (await getDoc(doc(db, "unidades", id))).data();
+            document.getElementById('nID').value = id; document.getElementById('nID').readOnly = true;
+            document.getElementById('nNome').value = e.nome;
+            document.getElementById('nTurmas').value = e.turmas ? e.turmas.join(", ") : "";
+            document.getElementById('nLimite').value = e.limiteAlunos || 100;
+            document.getElementById('nValor').value = e.mensalidade || 0;
+            document.getElementById('nVenc').value = e.vencimento || 10;
+            document.getElementById('nVencMes').value = e.vencMes || 1;
+            document.getElementById('nVencAno').value = e.vencAno || 2026;
+            document.getElementById('nPlanoNome').value = e.plano || "Personalizado";
+            document.getElementById('checkBib').checked = !!e.bibliotecaAtiva;
+            document.getElementById('checkMsg').checked = !!e.mensagensAtivas;
+            new bootstrap.Modal(document.getElementById('modalNovoCadastro')).show();
+        };
+
+        window.executarCadastroCompleto = async () => {
+            const id = document.getElementById('nID').value;
+            const data = {
+                escolaId: id, nome: document.getElementById('nNome').value, status: 'Ativo',
+                plano: document.getElementById('nPlanoNome').value,
+                turmas: document.getElementById('nTurmas').value.split(',').map(t => t.trim()).filter(t => t !== ""),
+                mensalidade: parseFloat(document.getElementById('nValor').value),
+                vencimento: parseInt(document.getElementById('nVenc').value),
+                vencMes: parseInt(document.getElementById('nVencMes').value),
+                vencAno: parseInt(document.getElementById('nVencAno').value),
+                limiteAlunos: parseInt(document.getElementById('nLimite').value),
+                bibliotecaAtiva: document.getElementById('checkBib').checked,
+                mensagensAtivas: document.getElementById('checkMsg').checked
+            };
+            if(!document.getElementById('nID').readOnly && document.getElementById('nEmail').value) {
+                try {
+                    await createUserWithEmailAndPassword(secAuth, document.getElementById('nEmail').value, document.getElementById('nSenha').value);
+                    await setDoc(doc(db, "logins", document.getElementById('nEmail').value), { email: document.getElementById('nEmail').value, senha: document.getElementById('nSenha').value, escolaId: id, usuario: document.getElementById('nNome').value, tipo: 'admin' });
+                    await signOut(secAuth);
+                } catch(e) {}
+            }
+            await setDoc(doc(db, "unidades", id), data, { merge: true });
+            bootstrap.Modal.getInstance(document.getElementById('modalNovoCadastro')).hide();
+            toast("Sincronizado!");
+        };
+
+        // GESTÃO OPERADORES
+        window.abrirGerenciamento = async (id) => { escolaAtualId = id; window.carregarUsuarios(); new bootstrap.Modal(document.getElementById('modalEscola')).show(); };
         window.carregarUsuarios = async () => {
             const snap = await getDocs(query(collection(db, "logins"), where("escolaId", "==", escolaAtualId)));
             const container = document.getElementById('listaUsuariosEscola'); container.innerHTML = "";
-            snap.forEach(d => { container.innerHTML += `<div class="user-item p-3 mb-2 bg-light rounded-3 d-flex justify-content-between"><span>${d.data().email}</span><button class="btn btn-sm btn-danger" onclick="window.excluirUser('${d.id}')"><i class="fas fa-trash"></i></button></div>`; });
+            snap.forEach(d => { const u = d.data(); container.innerHTML += `<div class="user-item p-3 mb-2 rounded-4 bg-white border d-flex justify-content-between"><div><span class="fw-bold">${u.email}</span><span class="badge bg-primary ms-2">${u.tipo}</span></div><div><button class="btn btn-sm btn-light text-danger" onclick="window.excluirUser('${d.id}')"><i class="fas fa-trash"></i></button></div></div>`; });
         };
-
         window.criarNovoUsuario = async () => {
-            const e = document.getElementById('newUserEmail').value, p = document.getElementById('newUserPass').value;
-            if(!e || p.length < 6) return toast("Dados inválidos!", "error");
-            try { await createUserWithEmailAndPassword(secondaryAuth, e, p); await setDoc(doc(db, "logins", e), { email: e, senha: p, escolaId: escolaAtualId, usuario: e.split('@')[0] }); await signOut(secondaryAuth); toast("Diretor criado!"); window.carregarUsuarios(); } catch (err) { toast(err.message, "error"); }
+            const e = document.getElementById('newUserEmail').value, p = document.getElementById('newUserPass').value, t = document.getElementById('newUserTipo').value;
+            try { await createUserWithEmailAndPassword(secAuth, e, p); await setDoc(doc(db, "logins", e), { email: e, senha: p, escolaId: escolaAtualId, usuario: e.split('@')[0], tipo: t }); await signOut(secAuth); window.carregarUsuarios(); toast("Criado!"); } catch (err) { toast(err.message, "error"); }
         };
 
-        window.excluirUser = async id => { if(confirm("Remover acesso?")) { await deleteDoc(doc(db, "logins", id)); window.carregarUsuarios(); } };
+        function updateChartLucro(labels, values) {
+            if(chartLucro) chartLucro.destroy();
+            chartLucro = new Chart(document.getElementById('chartLucro'), {
+                type: 'bar', data: { labels: labels, datasets: [{ label: 'Receita R$', data: values, backgroundColor: '#003399', borderRadius: 15 }] },
+                options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            });
+        }
         window.alterarStatus = async (id, st) => { await updateDoc(doc(db, "unidades", id), { status: st === 'Ativo' ? 'Bloqueado' : 'Ativo' }); };
-        window.logoutMaster = () => { signOut(auth); window.location.href = 'index.html'; };
-        window.trocarAba = (id, btn) => { 
-            document.querySelectorAll('.secao').forEach(s => s.classList.remove('ativa'));
-            document.getElementById(id).classList.add('ativa');
-            document.querySelectorAll('.nav-link-pe').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-        };
+        window.logoutMaster = () => { signOut(auth); localStorage.clear(); window.location.href = 'index.html'; };
+        window.trocarAba = (id, btn) => { document.querySelectorAll('.secao').forEach(s => { s.classList.remove('ativa'); s.style.display='none'; }); const t = document.getElementById(id); t.style.display='block'; setTimeout(() => t.classList.add('ativa'), 10); document.querySelectorAll('.nav-link-pe').forEach(b => b.classList.remove('active')); btn.classList.add('active'); };
         onSnapshot(collection(db, "alunos"), snap => { document.getElementById('dash-alunos').innerText = snap.size; });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

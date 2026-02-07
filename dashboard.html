@@ -33,9 +33,12 @@
             color: #1e293b;
             margin: 0;
             overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
         }
 
-        /* --- SIDEBAR DESIGN --- */
+        /* --- SIDEBAR DESIGN MELHORADO --- */
         .sidebar {
             width: var(--sidebar-w);
             background: linear-gradient(180deg, #001a4d 0%, #003399 100%);
@@ -46,6 +49,9 @@
             z-index: 1050;
             box-shadow: 10px 0 30px rgba(0,0,0,0.05);
             transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
         }
 
         .nav-link-pe {
@@ -77,7 +83,7 @@
         .main-content {
             margin-left: var(--sidebar-w);
             padding: 40px;
-            min-height: 100vh;
+            flex-grow: 1;
             transition: all 0.3s ease;
         }
 
@@ -105,12 +111,44 @@
         }
 
         @media (max-width: 992px) {
-            .sidebar { left: -100%; }
+            .sidebar { left: -100%; height: 100% !important; position: fixed; }
             .sidebar.show { left: 0; width: 80%; }
             .main-content { margin-left: 0 !important; padding: 20px !important; padding-top: 80px !important; }
             .btn-mobile-toggle { display: block; }
             .sidebar-overlay.show { display: block; }
             .stat-box h1 { font-size: 2.2rem; }
+        }
+
+        /* --- MODAL DE COMUNICADO (IMPACTO) --- */
+        #broadcast-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 26, 77, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .broadcast-card {
+            background: white;
+            width: 100%;
+            max-width: 500px;
+            border-radius: 32px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+
+        .broadcast-icon {
+            width: 80px; height: 80px; background: var(--accent); color: var(--primary);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 2rem; margin: 0 auto 20px;
         }
 
         /* --- CARD PREMIUM --- */
@@ -131,10 +169,7 @@
             padding: 25px;
             border-radius: 24px;
             color: white;
-            position: relative;
-            overflow: hidden;
-            border: none;
-            box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+            position: relative; overflow: hidden; border: none; box-shadow: 0 15px 30px rgba(0,0,0,0.1);
         }
 
         .stat-box i { position: absolute; right: -10px; bottom: -10px; font-size: 5rem; opacity: 0.15; transform: rotate(-15deg); }
@@ -161,31 +196,75 @@
         .accordion-button:not(.collapsed) { background-color: rgba(0, 51, 153, 0.05); color: var(--primary); box-shadow: none; }
         .accordion-button:focus { box-shadow: none; border-color: rgba(0,0,0,.125); }
 
-        /* Estilo da Lixeira */
-        .btn-delete-turma {
-            background: #fff5f5;
-            border: 1px solid #fee2e2;
-            color: var(--danger);
-            padding: 8px 12px;
-            border-radius: 12px;
-            transition: all 0.2s;
-            cursor: pointer;
-        }
+        .btn-delete-turma { background: #fff5f5; border: 1px solid #fee2e2; color: var(--danger); padding: 8px 12px; border-radius: 12px; transition: all 0.2s; cursor: pointer; }
         .btn-delete-turma:hover { background: var(--danger); color: white; transform: scale(1.05); }
 
-        /* Estilo do Modal de Confirmação */
         .modal-confirm-delete .modal-content { border-radius: 32px; border: none; }
         .modal-confirm-delete .modal-header { background: #fff5f5; color: var(--danger); border-radius: 32px 32px 0 0; border: none; padding: 25px; }
         .modal-confirm-delete .input-senha { background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 16px; padding: 12px; text-align: center; font-weight: 800; letter-spacing: 2px; }
 
+        /* NOVOS ESTILOS PARA RELATÓRIO DESIGNER */
+        .relatorio-header-card {
+            background: linear-gradient(135deg, #003399 0%, #001a4d 100%);
+            border-radius: 20px;
+            padding: 30px;
+            color: white;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        .table-relatorio-clean {
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        .table-relatorio-clean thead {
+            background: #f1f5f9;
+        }
+        .table-relatorio-clean th {
+            border: none;
+            color: #475569;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            padding: 15px;
+        }
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-weight: 800;
+            font-size: 0.7rem;
+        }
+
         @media print {
             .no-print { display: none !important; }
             .main-content { margin-left: 0; padding: 0; }
-            .card-premium { border: none; box-shadow: none; background: white; }
+            .card-premium { border: none; box-shadow: none; background: white; padding: 0; }
+            .table-responsive { overflow: visible !important; }
+            .badge { border: 1px solid #ccc; color: black !important; background: white !important; }
+            .bg-success { color: green !important; }
+            .bg-danger { color: red !important; }
         }
+
+        /* --- GESTÃO STYLE --- */
+        .plan-card { border-left: 8px solid var(--accent); }
+        .payment-card { border-left: 8px solid var(--success); }
     </style>
 </head>
 <body>
+
+    <div id="broadcast-overlay">
+        <div class="broadcast-card">
+            <div class="broadcast-icon"><i class="fas fa-bullhorn"></i></div>
+            <h4 class="fw-800 text-primary">Aviso Importante</h4>
+            <p id="broadcast-text" class="text-muted my-4" style="font-size: 1.1rem; line-height: 1.6;">---</p>
+            <div class="d-grid gap-2">
+                <button id="btn-pay-now" class="btn btn-success py-3 rounded-4 fw-bold shadow-sm" style="display:none;">
+                    <i class="fab fa-whatsapp me-2"></i>PAGAR AGORA
+                </button>
+                <button class="btn btn-primary py-3 rounded-4 fw-bold" onclick="window.fecharBroadcast()">ENTENDIDO</button>
+            </div>
+        </div>
+    </div>
 
     <button class="btn-mobile-toggle no-print" onclick="window.toggleMenu()">
         <i class="fas fa-bars"></i>
@@ -199,9 +278,9 @@
             <h5 class="fw-bold text-white mb-0">Acessa <span class="text-warning">Edu</span></h5>
         </div>
         
-        <div id="menu-links" class="d-flex flex-column gap-1"></div>
+        <div id="menu-links" class="d-flex flex-column gap-1 flex-grow-1"></div>
 
-        <div class="mt-auto pt-3 border-top border-white border-opacity-10">
+        <div class="mt-4 pt-3 border-top border-white border-opacity-10">
             <div class="p-3 rounded-4 bg-white bg-opacity-10 mb-3">
                 <small class="d-block opacity-50 mb-1">INSTITUIÇÃO</small>
                 <h6 id="school-display" class="fw-bold mb-0 small">---</h6>
@@ -253,6 +332,7 @@
                         </h5>
                         <input type="text" id="nAluno" class="form-control form-control-lg border-0 bg-light rounded-4 mb-3" placeholder="Nome Completo">
                         <select id="sAluno" class="form-select form-select-lg border-0 bg-light rounded-4 mb-3"></select>
+                        <input type="text" id="telAluno" class="form-control form-control-lg border-0 bg-light rounded-4 mb-3" placeholder="WhatsApp do Aluno (Ex: 819...)">
                         <input type="text" id="tAluno" class="form-control form-control-lg border-0 bg-light rounded-4 mb-4" placeholder="WhatsApp Responsável">
                         <div class="d-grid gap-3">
                             <button class="btn btn-primary-modern py-3 rounded-4 fw-bold" id="btnCam">ATIVAR CÂMERA</button>
@@ -277,20 +357,37 @@
 
         <div id="sec-relatorios" class="secao">
             <div class="card-premium no-print">
-                <h5 class="fw-bold mb-4 text-primary">Relatórios</h5>
+                <h5 class="fw-bold mb-4 text-primary">Relatórios de Frequência</h5>
                 <div class="row g-3 align-items-end">
-                    <div class="col-6 col-md-3"><input type="date" id="relData" class="form-control rounded-4 border-0 bg-light"></div>
-                    <div class="col-6 col-md-3"><select id="relTurma" class="form-select rounded-4 border-0 bg-light"></select></div>
+                    <div class="col-6 col-md-3"><label class="small fw-bold mb-2">DATA</label><input type="date" id="relData" class="form-control rounded-4 border-0 bg-light"></div>
+                    <div class="col-6 col-md-3"><label class="small fw-bold mb-2">TURMA</label><select id="relTurma" class="form-select rounded-4 border-0 bg-light"></select></div>
                     <div class="col-12 col-md-6 d-flex gap-2">
-                        <button class="btn btn-primary-modern flex-grow-1 rounded-4 fw-bold" onclick="window.gerarRelatorio()">VISUALIZAR</button>
+                        <button class="btn btn-primary-modern flex-grow-1 rounded-4 fw-bold" onclick="window.gerarRelatorio()">GERAR LISTA</button>
                         <button class="btn btn-success rounded-4 fw-bold" onclick="window.exportarRelatorioExcel()"><i class="fas fa-file-excel"></i></button>
-                        <button class="btn btn-danger rounded-4 fw-bold" onclick="window.imprimirRelatorio()"><i class="fas fa-file-pdf"></i></button>
+                        <button class="btn btn-danger rounded-4 fw-bold" onclick="window.imprimirRelatorio()"><i class="fas fa-file-pdf"></i> PDF</button>
                     </div>
                 </div>
             </div>
             <div class="card-premium" id="area-relatorio">
-                <div class="text-center mb-4"><h4 class="fw-bold m-0" id="rel-escola-nome">---</h4><p class="text-muted" id="rel-subtitulo">Selecione os filtros acima</p></div>
-                <div class="table-responsive"><table class="table table-hover align-middle" id="tabela-relatorio"><thead><tr class="table-light"><th>ESTUDANTE</th><th>TURMA</th><th>STATUS</th><th>HORÁRIO</th></tr></thead><tbody id="listaRelatorio"></tbody></table></div>
+                <div class="relatorio-header-card">
+                    <h2 class="fw-800 m-0" id="rel-escola-nome">---</h2>
+                    <h5 class="text-warning mt-2 fw-bold">RELATÓRIO DE FREQUÊNCIA DIÁRIA</h5>
+                    <p class="mb-0 opacity-75 small fw-bold" id="rel-subtitulo">Selecione os filtros acima</p>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle table-relatorio-clean" id="tabela-relatorio">
+                        <thead>
+                            <tr>
+                                <th class="ps-4">ESTUDANTE</th>
+                                <th>TURMA</th>
+                                <th class="text-center">STATUS</th>
+                                <th class="text-end pe-4">HORÁRIO</th>
+                            </tr>
+                        </thead>
+                        <tbody id="listaRelatorio"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -301,6 +398,55 @@
                     <input type="text" id="buscaA" class="form-control w-25 rounded-pill shadow-sm border-0 bg-light" placeholder="Pesquisar..." onkeyup="window.filtrarAlunos()">
                 </div>
                 <div class="accordion accordion-flush" id="accordionEstudantes"></div>
+            </div>
+        </div>
+
+        <div id="sec-gestao" class="secao">
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="card-premium plan-card h-100">
+                        <h4 class="fw-bold mb-4">Meu Plano</h4>
+                        <div class="p-4 bg-light rounded-4 mb-4">
+                            <h2 class="fw-bold text-primary mb-1" id="gestao-plano-nome">Carregando...</h2>
+                            <p class="text-muted mb-0">Assinatura Ativa ✅</p>
+                        </div>
+                        <ul class="list-unstyled">
+                            <li class="mb-3 d-flex justify-content-between border-bottom pb-2">
+                                <span class="text-muted">Cota de Alunos</span>
+                                <span class="fw-bold" id="gestao-cota">---</span>
+                            </li>
+                            <li class="mb-3 d-flex justify-content-between border-bottom pb-2">
+                                <span class="text-muted">Biblioteca Digital</span>
+                                <span id="status-bib-icon">---</span>
+                            </li>
+                            <li class="mb-3 d-flex justify-content-between border-bottom pb-2">
+                                <span class="text-muted">Disparos WhatsApp</span>
+                                <span id="status-msg-icon">---</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card-premium payment-card h-100">
+                        <h4 class="fw-bold mb-4">Financeiro</h4>
+                        <div class="p-4 bg-light rounded-4 mb-4 text-center">
+                            <small class="text-muted d-block text-uppercase fw-bold">Investimento Mensal</small>
+                            <h2 class="fw-bold text-primary mb-3" id="gestao-valor-pago">R$ ---</h2>
+                            <hr>
+                            <small class="text-muted d-block text-uppercase fw-bold mt-2">Próximo Vencimento</small>
+                            <h3 class="fw-bold text-success" id="gestao-data-venc">---</h3>
+                            <span class="badge bg-success rounded-pill px-4 py-2 mt-2" id="gestao-dias-rest">---</span>
+                        </div>
+                        <div class="d-grid gap-3">
+                            <button class="btn btn-success py-3 rounded-4 fw-bold shadow-sm" onclick="window.solicitarFatura()">
+                                <i class="fas fa-file-invoice-dollar me-2"></i>SOLICITAR FATURA
+                            </button>
+                            <button class="btn btn-outline-primary py-3 rounded-4 fw-bold" onclick="window.suporteTecnico()">
+                                <i class="fas fa-headset me-2"></i>SUPORTE TÉCNICO
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -323,7 +469,7 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg">
                 <div class="modal-header text-center d-block">
-                    <i class="fas fa-exclamation-circle fa-3x mb-3"></i>
+                    <i class="fas fa-exclamation-circle fa-3x mb-3 text-danger"></i>
                     <h5 class="fw-bold m-0" id="txtTurmaApagar">Apagar Turma</h5>
                 </div>
                 <div class="modal-body p-4 text-center">
@@ -346,7 +492,15 @@
 
     <div class="modal fade" id="modalEditAluno" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content p-4 rounded-5 border-0"><h5 class="fw-bold mb-4">Editar Cadastro</h5><input type="hidden" id="editId"><input type="text" id="editNome" class="form-control mb-3 shadow-none border-light bg-light"><select id="editSala" class="form-select shadow-none border-light bg-light mb-3"></select><input type="text" id="editTel" class="form-control mb-4 shadow-none border-light bg-light"><button class="btn btn-primary-modern w-100" onclick="window.confirmarEdicao()">SALVAR</button></div>
+            <div class="modal-content p-4 rounded-5 border-0">
+                <h5 class="fw-bold mb-4">Editar Cadastro</h5>
+                <input type="hidden" id="editId">
+                <input type="text" id="editNome" class="form-control mb-3 shadow-none border-light bg-light" placeholder="Nome">
+                <select id="editSala" class="form-select shadow-none border-light bg-light mb-3"></select>
+                <input type="text" id="editTelAluno" class="form-control mb-3 shadow-none border-light bg-light" placeholder="WhatsApp Aluno">
+                <input type="text" id="editTel" class="form-control mb-4 shadow-none border-light bg-light" placeholder="WhatsApp Responsável">
+                <button class="btn btn-primary-modern w-100" onclick="window.confirmarEdicao()">SALVAR</button>
+            </div>
         </div>
     </div>
 
@@ -376,7 +530,48 @@
                     if (data.status === 'Bloqueado') {
                         Swal.fire({ icon: 'error', title: 'Acesso Suspenso', text: 'Esta unidade foi bloqueada pelo administrador.', confirmButtonColor: '#003399' }).then(() => window.logout());
                     }
-                    document.getElementById('st-cota-max').innerText = data.limiteAlunos || 0;
+                    
+                    const cotaTotal = data.limiteAlunos || 0;
+                    document.getElementById('st-cota-max').innerText = cotaTotal;
+                    document.getElementById('gestao-cota').innerText = cotaTotal + " Alunos";
+                    document.getElementById('gestao-plano-nome').innerText = data.plano || "Personalizado";
+                    
+                    const valorMensal = parseFloat(data.mensalidade || 0);
+                    document.getElementById('gestao-valor-pago').innerText = `R$ ${valorMensal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+
+                    const bibStatus = data.bibliotecaAtiva ? '<span class="text-success fw-bold"><i class="fas fa-check-circle"></i> ATIVO</span>' : '<span class="text-danger fw-bold"><i class="fas fa-times-circle"></i> INATIVO</span>';
+                    const msgStatus = data.mensagensAtivas ? '<span class="text-success fw-bold"><i class="fas fa-check-circle"></i> ATIVO</span>' : '<span class="text-danger fw-bold"><i class="fas fa-times-circle"></i> INATIVO</span>';
+                    
+                    document.getElementById('status-bib-icon').innerHTML = bibStatus;
+                    document.getElementById('status-msg-icon').innerHTML = msgStatus;
+
+                    montarMenu(data.bibliotecaAtiva, data.mensagensAtivas);
+
+                    const vencDia = data.vencimento || 10;
+                    const vencMes = data.vencMes || (new Date().getMonth() + 1);
+                    const vencAno = data.vencAno || new Date().getFullYear();
+                    
+                    document.getElementById('gestao-data-venc').innerText = `${vencDia}/${vencMes}/${vencAno}`;
+                    
+                    const hoje = new Date(); hoje.setHours(0,0,0,0);
+                    const dataVencReal = new Date(vencAno, vencMes - 1, vencDia); dataVencReal.setHours(0,0,0,0);
+                    
+                    const diffTime = dataVencReal - hoje;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    const elDias = document.getElementById('gestao-dias-rest');
+                    if (diffDays < 0) {
+                        elDias.innerText = `Vencido há ${Math.abs(diffDays)} dias`;
+                        elDias.className = "badge bg-danger rounded-pill px-4 py-2 mt-2";
+                    } else if (diffDays === 0) {
+                        elDias.innerText = `Vence Hoje!`;
+                        elDias.className = "badge bg-warning text-dark rounded-pill px-4 py-2 mt-2";
+                    } else {
+                        elDias.innerText = `Faltam ${diffDays} dias para o vencimento`;
+                        elDias.className = "badge bg-success rounded-pill px-4 py-2 mt-2";
+                    }
+
+                    verificarCotaDisponivel();
                 }
             });
 
@@ -387,34 +582,77 @@
                     const turmas = escDoc.data().turmas || [];
                     const s = document.getElementById('sAluno'), e = document.getElementById('editSala'), r = document.getElementById('relTurma');
                     let opt = turmas.map(t => `<option value="${t}">${t}</option>`).join('');
-                    s.innerHTML = opt; e.innerHTML = opt; r.innerHTML = `<option value="TODAS">Todas</option>` + opt;
+                    s.innerHTML = opt; e.innerHTML = opt; r.innerHTML = `<option value="TODAS">Todas as Turmas</option>` + opt;
                 }
             } catch (e) {}
-            montarMenu(); initIA(); escutarDados();
+            initIA(); escutarDados(); escutarBroadcast();
         }
+
+        // --- SISTEMA DE ALERTA DE COTA (NOVO) ---
+        window.alertaCotaAtingida = () => {
+            Swal.fire({
+                title: "Limite de Alunos Atingido!",
+                text: "Deseja aumentar sua cota de alunos disponíveis para continuar cadastrando?",
+                icon: "warning",
+                showCancelButton: true,
+                confirmButtonColor: "#10b981",
+                cancelButtonColor: "#6c757d",
+                confirmButtonText: "<i class='fab fa-whatsapp me-2'></i>FALAR COM SUPORTE",
+                cancelButtonText: "CANCELAR",
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.open(`https://api.whatsapp.com/send?phone=5581988300323&text=Olá Gabriel, sou da escola ${logado.escolaId.toUpperCase()} e atingi o meu limite de alunos. Gostaria de aumentar minha cota.`, '_blank');
+                }
+            });
+        };
+
+        // --- ACRESCIMO: FUNÇÕES FINANCEIRO E SUPORTE ---
+        window.solicitarFatura = () => {
+            const msg = `Olá Gabriel, sou da escola ${logado.escolaId.toUpperCase()} e gostaria de solicitar a minha fatura.`;
+            window.open(`https://api.whatsapp.com/send?phone=5581988300323&text=${encodeURIComponent(msg)}`, '_blank');
+        };
+
+        window.suporteTecnico = () => {
+            const msg = `Olá Gabriel, preciso de suporte técnico no painel da escola ${logado.escolaId.toUpperCase()}`;
+            window.open(`https://api.whatsapp.com/send?phone=5581988300323&text=${encodeURIComponent(msg)}`, '_blank');
+        };
+
+        function escutarBroadcast() {
+            onSnapshot(doc(db, "unidades", logado.escolaId, "comunicados", "master"), snap => {
+                const overlay = document.getElementById('broadcast-overlay');
+                if(snap.exists() && snap.data().ativo) {
+                    const msg = snap.data().mensagem;
+                    document.getElementById('broadcast-text').innerText = msg;
+                    overlay.style.display = 'flex';
+
+                    if(msg.toLowerCase().includes("vencimento") || msg.toLowerCase().includes("pagamento") || msg.toLowerCase().includes("atraso") || msg.toLowerCase().includes("bloqueio")) {
+                        const btnPay = document.getElementById('btn-pay-now');
+                        btnPay.style.display = 'block';
+                        btnPay.onclick = () => {
+                            window.open(`https://api.whatsapp.com/send?phone=5581988300323&text=Olá Gabriel, sou da escola ${logado.escolaId.toUpperCase()} e desejo realizar o pagamento da mensalidade.`, '_blank');
+                        };
+                    }
+                }
+            });
+        }
+
+        // CORREÇÃO: Ao fechar o aviso, ativa automaticamente o Painel para evitar tela branca
+        window.fecharBroadcast = () => { 
+            document.getElementById('broadcast-overlay').style.display = 'none'; 
+            window.trocarAba('sec-stats', document.querySelector('.nav-link-pe')); 
+        };
 
         async function verificarCotaDisponivel() {
             try {
                 const escDoc = await getDoc(doc(db, "unidades", logado.escolaId));
-                if (!escDoc.exists()) return { autorizado: false, msg: "Unidade não encontrada." };
+                if (!escDoc.exists()) return { autorizado: false };
                 const limite = escDoc.data().limiteAlunos || 0;
-                const qAlunos = query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId));
-                const snapAlunos = await getDocs(qAlunos);
-                const totalAtual = snapAlunos.size;
-                
+                const snapAlunos = await getDocs(query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId)));
                 const badge = document.getElementById('cota-badge');
-                if(badge) badge.innerText = `Cota: ${totalAtual}/${limite}`;
-                
-                const cardCota = document.getElementById('st-cota-max');
-                if(cardCota) cardCota.innerText = limite;
-
-                if (totalAtual >= limite) {
-                    return { autorizado: false, msg: `Limite de cota atingido (${totalAtual}/${limite}). Contrate um plano maior.` };
-                }
-                return { autorizado: true };
-            } catch (e) {
-                return { autorizado: false, msg: "Erro ao validar cota." };
-            }
+                if(badge) badge.innerText = `Cota: ${snapAlunos.size}/${limite}`;
+                return { autorizado: snapAlunos.size < limite, msg: `Limite atingido.` };
+            } catch (e) { return { autorizado: false }; }
         }
 
         window.importarExcel = async (input) => {
@@ -423,149 +661,184 @@
             reader.onload = async (e) => {
                 const data = new Uint8Array(e.target.result); const workbook = XLSX.read(data, { type: 'array' });
                 const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
-                
-                const cota = await verificarCotaDisponivel();
-                if(!cota.autorizado) {
-                    status.innerText = "Erro: Limite atingido.";
-                    return Swal.fire("Limite de Alunos", cota.msg, "warning");
-                }
-
                 for (let i = 1; i < json.length; i++) {
                     const [nome, turma, tel] = json[i];
                     if (nome && turma) {
-                        const check = await verificarCotaDisponivel();
-                        if(!check.autorizado) break; 
-                        await addDoc(collection(db, "alunos"), { nome: nome.toString(), sala: turma.toString(), escolaId: logado.escolaId, descritor: null, tel: tel ? tel.toString() : "" });
+                        const cota = await verificarCotaDisponivel();
+                        if(!cota.autorizado) { 
+                            status.innerText = "Limite atingido."; 
+                            window.alertaCotaAtingida();
+                            return; 
+                        }
+                        await addDoc(collection(db, "alunos"), { nome: nome.toString(), sala: turma.toString(), escolaId: logado.escolaId, descritor: null, tel: tel ? tel.toString() : "", telefone: "" });
                     }
                 }
                 status.innerText = "Sucesso!";
             }; reader.readAsArrayBuffer(file);
         };
 
-        window.baixarModeloExcel = () => { const dados = [["Nome", "Turma", "WhatsApp"]]; const ws = XLSX.utils.aoa_to_sheet(dados); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Modelo"); XLSX.writeFile(wb, "Modelo_Alunos.xlsx"); };
+        window.baixarModeloExcel = () => { const ws = XLSX.utils.aoa_to_sheet([["Nome", "Turma", "WhatsApp"]]); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Modelo"); XLSX.writeFile(wb, "Modelo_Alunos.xlsx"); };
 
-        function montarMenu() {
-            const itens = [{id:'sec-stats', label:'Painel', icon:'fa-chart-pie'},{id:'sec-facial', label:'Matrícula', icon:'fa-user-plus'},{id:'sec-gestao-face', label:'Biometria', icon:'fa-fingerprint'},{id:'sec-relatorios', label:'Relatórios', icon:'fa-file-invoice'},{id:'sec-faltas', label:'Estudantes', icon:'fa-users'},{id:'sec-importar', label:'Importar Excel', icon:'fa-file-excel text-success'}];
-            document.getElementById('menu-links').innerHTML = itens.map(i => `<a href="#" class="nav-link-pe" onclick="window.trocarAba('${i.id}', this)"><i class="fas ${i.icon}"></i> ${i.label}</a>`).join('');
-            window.trocarAba('sec-stats', document.querySelector('.nav-link-pe'));
+        function montarMenu(libLiberada, msgLiberada) {
+            const itens = [
+                {id:'sec-stats', label:'Painel', icon:'fa-chart-pie'},
+                {id:'sec-facial', label:'Matrícula', icon:'fa-user-plus'},
+                {id:'sec-gestao-face', label:'Biometria', icon:'fa-fingerprint'},
+                {id:'sec-relatorios', label:'Relatórios', icon:'fa-file-invoice'},
+                {id:'sec-faltas', label:'Estudantes', icon:'fa-users'},
+                {id:'sec-gestao', label:'Minha Assinatura', icon:'fa-gem text-warning'}
+            ];
+            if(libLiberada) itens.push({id:'link-bib', label:'Biblioteca', icon:'fa-book text-warning', isLink: true, url: 'biblioteca.html'});
+            itens.push({id:'sec-importar', label:'Importar Excel', icon:'fa-file-excel text-success'});
+
+            document.getElementById('menu-links').innerHTML = itens.map(i => {
+                if(i.isLink) return `<a href="${i.url}" class="nav-link-pe"><i class="fas ${i.icon}"></i> ${i.label}</a>`;
+                return `<a href="#" class="nav-link-pe" onclick="window.trocarAba('${i.id}', this)"><i class="fas ${i.icon}"></i> ${i.label}</a>`;
+            }).join('');
+
+            // Ativa o link do Painel visualmente se não houver broadcast aberto
+            if(document.getElementById('broadcast-overlay').style.display !== 'flex') {
+                const primeiroLink = document.querySelector('.nav-link-pe');
+                if(primeiroLink) window.trocarAba('sec-stats', primeiroLink);
+            }
         }
 
         window.trocarAba = (id, btn) => {
-            // --- ACRESCENTADO: DESLIGAR CAMERA AO SAIR DA ABA MATRÍCULA ---
             const video = document.getElementById('webcam');
-            if (video && video.srcObject) {
-                video.srcObject.getTracks().forEach(track => track.stop());
-                video.srcObject = null;
-                document.getElementById('ia-status').innerText = "Câmera desligada automaticamente.";
-            }
-
+            if (video && video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
             document.querySelectorAll('.secao').forEach(s => s.classList.remove('ativa'));
-            document.getElementById(id).classList.add('ativa');
+            const target = document.getElementById(id);
+            if(target) target.classList.add('ativa');
             document.querySelectorAll('.nav-link-pe').forEach(b => b.classList.remove('active'));
             if(btn) btn.classList.add('active');
             if(window.innerWidth <= 992) window.toggleMenu();
             if(id === 'sec-stats') updateCharts();
-            if(id === 'sec-facial') verificarCotaDisponivel(); 
         };
 
+        // --- SISTEMA DE RELATÓRIO CORRIGIDO E MELHORADO COM ORDEM ALFABÉTICA ---
         window.gerarRelatorio = async () => {
-            const dF = new Date(document.getElementById('relData').value + 'T00:00:00').toLocaleDateString('pt-BR');
-            const tF = document.getElementById('relTurma').value;
-            const body = document.getElementById('listaRelatorio'); body.innerHTML = "Lendo...";
+            const dataSel = document.getElementById('relData').value;
+            if(!dataSel) return Swal.fire("Atenção", "Selecione uma data", "warning");
+
+            const dataFormatada = new Date(dataSel + 'T00:00:00').toLocaleDateString('pt-BR');
+            const turmaSel = document.getElementById('relTurma').value;
+            
+            document.getElementById('rel-subtitulo').innerText = `Data: ${dataFormatada} | Turma: ${turmaSel}`;
+            const body = document.getElementById('listaRelatorio'); 
+            body.innerHTML = '<tr><td colspan="4" class="text-center py-4">Processando lista...</td></tr>';
+            
             try {
-                let qA = query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId)); if(tF !== "TODAS") qA = query(qA, where("sala", "==", tF));
-                const snapA = await getDocs(qA);
-                const qFr = query(collection(db, "frequencia"), where("escolaId", "==", logado.escolaId), where("data", "==", dF));
-                const snapFr = await getDocs(qFr); const mapa = {}; snapFr.forEach(d => mapa[d.data().nome] = d.data().hora);
-                let h = ""; snapA.forEach(d => { const al = d.data(); const pres = mapa[al.nome]; h += `<tr><td class="fw-bold">${al.nome}</td><td>${al.sala}</td><td><span class="badge rounded-pill ${pres?'bg-success':'bg-danger'}">${pres?'PRESENTE':'FALTA'}</span></td><td>${pres||'--'}</td></tr>`; });
-                body.innerHTML = h || "Sem dados."; document.getElementById('rel-subtitulo').innerText = `${dF} (${tF})`;
-            } catch (e) { body.innerHTML = "Erro."; }
+                let qAlunos = query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId));
+                if(turmaSel !== "TODAS") qAlunos = query(qAlunos, where("sala", "==", turmaSel));
+                const snapAlunos = await getDocs(qAlunos);
+                
+                const qFreq = query(collection(db, "frequencia"), where("escolaId", "==", logado.escolaId), where("data", "==", dataFormatada));
+                const snapFreq = await getDocs(qFreq);
+                
+                const mapaPresenca = {};
+                snapFreq.forEach(d => { mapaPresenca[d.data().nome] = d.data().hora; });
+                
+                // --- MELHORIA: TRANSFORMA EM ARRAY E ORDENA ALFABETICAMENTE ---
+                let listaAlunosArr = [];
+                snapAlunos.forEach(d => listaAlunosArr.push(d.data()));
+                listaAlunosArr.sort((a, b) => a.nome.localeCompare(b.nome));
+
+                let html = "";
+                listaAlunosArr.forEach(al => {
+                    const pres = mapaPresenca[al.nome];
+                    html += `
+                    <tr>
+                        <td class="ps-4 fw-bold text-uppercase" style="font-size:0.85rem">${al.nome}</td>
+                        <td class="text-muted" style="font-size:0.85rem">${al.sala}</td>
+                        <td class="text-center">
+                            <span class="status-badge ${pres ? 'bg-success text-white' : 'bg-danger text-white'}">
+                                ${pres ? 'PRESENTE' : 'FALTOU'}
+                            </span>
+                        </td>
+                        <td class="text-end pe-4 fw-bold text-primary">${pres || '--:--'}</td>
+                    </tr>`;
+                });
+                body.innerHTML = html || '<tr><td colspan="4" class="text-center py-4">Nenhum registro encontrado.</td></tr>';
+            } catch (e) { body.innerHTML = '<tr><td colspan="4">Erro ao carregar dados.</td></tr>'; }
         };
 
-        window.exportarRelatorioExcel = () => { XLSX.writeFile(XLSX.utils.table_to_book(document.getElementById("tabela-relatorio")), `SIAF_Relatorio.xlsx`); };
-        window.imprimirRelatorio = () => { window.print(); };
+        // EXPORTAR EXCEL CORRIGIDO
+        window.exportarRelatorioExcel = () => {
+            const tabela = document.getElementById('tabela-relatorio');
+            const wb = XLSX.utils.table_to_book(tabela, { sheet: "Frequência" });
+            XLSX.writeFile(wb, `Relatorio_Frequencia_${logado.escolaId.toUpperCase()}.xlsx`);
+        };
+
+        // IMPRIMIR PDF CORRIGIDO
+        window.imprimirRelatorio = () => {
+            window.print();
+        };
 
         document.getElementById('btnSalvar').onclick = async () => {
             const n = document.getElementById('nAluno').value.trim();
             const s = document.getElementById('sAluno').value;
-            const t = document.getElementById('tAluno').value.trim();
             const v = document.getElementById('webcam');
             if(!n) return Swal.fire("Erro", "Nome obrigatório", "error");
-            const cota = await verificarCotaDisponivel();
-            if(!cota.autorizado) return Swal.fire("Limite Atingido", cota.msg, "warning");
+            
+            const cota = await verificarCotaDisponivel(); 
+            if(!cota.autorizado) return window.alertaCotaAtingida();
+
             const det = await faceapi.detectSingleFace(v, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
             if(!det) return Swal.fire("Atenção", "Rosto não detectado", "warning");
-            try {
-                await addDoc(collection(db, "alunos"), { nome: n, sala: s, escolaId: logado.escolaId, descritor: Array.from(det.descriptor), tel: t });
-                Swal.fire("Sucesso", "Aluno cadastrado!", "success");
-                document.getElementById('nAluno').value = ""; document.getElementById('tAluno').value = "";
-                verificarCotaDisponivel();
-            } catch(e) { Swal.fire("Erro", "Falha ao salvar", "error"); }
+            await addDoc(collection(db, "alunos"), { nome: n, sala: s, escolaId: logado.escolaId, descritor: Array.from(det.descriptor), tel: document.getElementById('tAluno').value, telefone: document.getElementById('telAluno').value });
+            Swal.fire("Sucesso", "Aluno cadastrado!", "success");
         };
 
         async function initIA() { const U = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'; await faceapi.nets.tinyFaceDetector.loadFromUri(U); await faceapi.nets.faceLandmark68Net.loadFromUri(U); await faceapi.nets.faceRecognitionNet.loadFromUri(U); }
         document.getElementById('btnCam').onclick = async () => { const s = await navigator.mediaDevices.getUserMedia({ video: true }); document.getElementById('webcam').srcObject = s; };
 
         window.salvarSemBiometria = async () => { 
-            const n = document.getElementById('nAluno').value, s = document.getElementById('sAluno').value; 
-            if(!n) return Swal.fire("Erro", "Nome obrigatório", "error"); 
-            const cota = await verificarCotaDisponivel();
-            if(!cota.autorizado) return Swal.fire("Limite Atingido", cota.msg, "warning");
-            await addDoc(collection(db, "alunos"), { nome: n, sala: s, escolaId: logado.escolaId, descritor: null, tel: document.getElementById('tAluno').value }); 
-            Swal.fire("Sucesso", "Cadastrado com sucesso!", "success"); 
-            document.getElementById('nAluno').value = ""; 
-            verificarCotaDisponivel();
+            const n = document.getElementById('nAluno').value.trim();
+            if(!n) return Swal.fire("Erro", "Nome obrigatório", "error");
+
+            const cota = await verificarCotaDisponivel(); 
+            if(!cota.autorizado) return window.alertaCotaAtingida();
+
+            await addDoc(collection(db, "alunos"), { nome: document.getElementById('nAluno').value, sala: document.getElementById('sAluno').value, escolaId: logado.escolaId, descritor: null, tel: document.getElementById('tAluno').value, telefone: document.getElementById('telAluno').value }); 
+            Swal.fire("Sucesso!", "Aluno cadastrado com sucesso.", "success");
         };
 
         function escutarDados() {
-            const q = query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId));
-            onSnapshot(q, snap => {
-                const accordionE = document.getElementById('accordionEstudantes');
-                const accordionB = document.getElementById('accordionBiometria');
+            onSnapshot(query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId)), snap => {
+                const accordionE = document.getElementById('accordionEstudantes'), accordionB = document.getElementById('accordionBiometria');
                 accordionE.innerHTML = ""; accordionB.innerHTML = "";
-                let turmas = {};
-                snap.forEach(d => { 
-                    let a = d.data(); if(!turmas[a.sala]) turmas[a.sala] = []; turmas[a.sala].push({id: d.id, ...a}); 
-                });
+                let turmas = {}; snap.forEach(d => { let a = d.data(); if(!turmas[a.sala]) turmas[a.sala] = []; turmas[a.sala].push({id: d.id, ...a}); });
                 Object.keys(turmas).sort().forEach(t => {
-                    const idT = t.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
-                    const idAccordionE = `accE-${idT}`; const idAccordionB = `accB-${idT}`;
-                    let linhasEstudantes = ""; let cardsBiometria = "";
+                    const idT = t.replace(/\s+/g, '-');
+                    let linesE = "", cardsB = "";
                     turmas[t].sort((a,b)=>a.nome.localeCompare(b.nome)).forEach(al => {
-                        linhasEstudantes += `<tr class="aluno-row"><td class="ps-4 fw-bold text-uppercase" style="font-size: 0.85rem;">${al.nome}</td><td class="text-end pe-4"><button class="btn btn-sm btn-light rounded-pill me-1" onclick="window.abrirEdicao('${al.id}','${al.nome}','${al.sala}','${al.tel||''}')"><i class="fas fa-edit text-primary"></i></button><button class="btn btn-sm btn-light rounded-pill" onclick="window.del('alunos','${al.id}', '${al.nome}')"><i class="fas fa-trash text-danger"></i></button></td></tr>`;
+                        linesE += `<tr><td class="ps-4 fw-bold small text-uppercase">${al.nome}</td><td class="text-end pe-4"><button class="btn btn-sm btn-light text-primary me-2" onclick="window.abrirEdicao('${al.id}','${al.nome}','${al.sala}','${al.tel}','${al.telefone}')"><i class="fas fa-edit"></i></button><button class="btn btn-sm btn-light text-danger" onclick="window.del('alunos','${al.id}', '${al.nome}')"><i class="fas fa-trash"></i></button></td></tr>`;
                         const tem = !!al.descritor;
-                        cardsBiometria += `<div class="col item-face" data-nome="${al.nome.toLowerCase()}"><div class="p-3 bg-white border rounded-4 d-flex justify-content-between align-items-center shadow-sm"><div><span class="fw-bold d-block small">${al.nome}</span><small class="${tem?'text-success':'text-danger'} fw-bold">${tem?'ATIVO':'SEM FACE'}</small></div><button class="btn btn-sm ${tem?'btn-outline-primary':'btn-primary'} px-3 rounded-3" onclick="window.abrirCapturaModal('${al.id}','${al.nome}')">${tem?'REFAZER':'VINCULAR'}</button></div></div>`;
+                        cardsB += `<div class="col item-face" data-nome="${al.nome.toLowerCase()}"><div class="p-3 bg-white border rounded-4 d-flex justify-content-between align-items-center"><div><span class="fw-bold small">${al.nome}</span><br><small class="${tem?'text-success':'text-danger'} fw-bold">${tem?'ATIVO':'SEM FACE'}</small></div><button class="btn btn-sm ${tem?'btn-outline-primary':'btn-primary'}" onclick="window.abrirCapturaModal('${al.id}','${al.nome}')">VINCULAR</button></div></div>`;
                     });
-                    accordionE.innerHTML += `<div class="accordion-item border-0 mb-3 shadow-sm rounded-4 overflow-hidden"><div class="d-flex align-items-center bg-white pr-3"><h2 class="accordion-header flex-grow-1"><button class="accordion-button collapsed fw-bold text-primary py-4 px-4 bg-white" type="button" data-bs-toggle="collapse" data-bs-target="#${idAccordionE}"><i class="fas fa-graduation-cap me-2"></i> ${t}</button></h2><button class="btn-delete-turma no-print" onclick="window.abrirModalApagarTurma('${t}')" title="Apagar Turma"><i class="fas fa-trash-alt"></i></button></div><div id="${idAccordionE}" class="accordion-collapse collapse"><div class="accordion-body p-0"><table class="table-estudantes mb-0"><tbody>${linhasEstudantes}</tbody></table></div></div></div>`;
-                    accordionB.innerHTML += `<div class="accordion-item border-0 mb-3 shadow-sm rounded-4 overflow-hidden"><h2 class="accordion-header"><button class="accordion-button collapsed fw-bold text-primary py-4 px-4 bg-white" type="button" data-bs-toggle="collapse" data-bs-target="#${idAccordionB}"><i class="fas fa-fingerprint me-2"></i> ${t}</button></h2><div id="${idAccordionB}" class="accordion-collapse collapse"><div class="accordion-body p-4 bg-light"><div class="row row-cols-1 row-cols-md-2 g-3">${cardsBiometria}</div></div></div></div>`;
+                    accordionE.innerHTML += `<div class="accordion-item border-0 mb-3 shadow-sm rounded-4 overflow-hidden"><div class="d-flex align-items-center bg-white pr-3"><h2 class="accordion-header flex-grow-1"><button class="accordion-button collapsed fw-bold text-primary py-4 px-4 bg-white" type="button" data-bs-toggle="collapse" data-bs-target="#accE-${idT}"><i class="fas fa-graduation-cap me-2"></i> ${t}</button></h2><button class="btn-delete-turma no-print" onclick="window.abrirModalApagarTurma('${t}')"><i class="fas fa-trash-alt"></i></button></div><div id="accE-${idT}" class="accordion-collapse collapse"><div class="accordion-body p-0"><table class="table-estudantes mb-0"><tbody>${linesE}</tbody></table></div></div></div>`;
+                    accordionB.innerHTML += `<div class="accordion-item border-0 mb-3 shadow-sm rounded-4 overflow-hidden"><h2 class="accordion-header"><button class="accordion-button collapsed fw-bold text-primary py-4 px-4 bg-white" type="button" data-bs-toggle="collapse" data-bs-target="#accB-${idT}"><i class="fas fa-fingerprint me-2"></i> ${t}</button></h2><div id="accB-${idT}" class="accordion-collapse collapse"><div class="accordion-body p-4 bg-light"><div class="row row-cols-1 row-cols-md-2 g-3">${cardsB}</div></div></div></div>`;
                 });
                 document.getElementById('st-total').innerText = snap.size;
-                verificarCotaDisponivel();
             });
-            const hj = new Date().toLocaleDateString('pt-BR');
-            onSnapshot(query(collection(db, "frequencia"), where("escolaId", "==", logado.escolaId), where("data", "==", hj)), snap => { document.getElementById('st-presentes').innerText = snap.size; updateCharts(); });
+            onSnapshot(query(collection(db, "frequencia"), where("escolaId", "==", logado.escolaId), where("data", "==", new Date().toLocaleDateString('pt-BR'))), snap => { document.getElementById('st-presentes').innerText = snap.size; updateCharts(); });
         }
 
-        window.abrirModalApagarTurma = (turma) => {
-            turmaParaApagarGlobal = turma; document.getElementById('txtTurmaApagar').innerText = `Apagar ${turma}`; document.getElementById('senhaApagarTurma').value = ""; new bootstrap.Modal(document.getElementById('modalConfirmarApagarTurma')).show();
-        };
-
+        window.abrirModalApagarTurma = (turma) => { turmaParaApagarGlobal = turma; document.getElementById('txtTurmaApagar').innerText = `Apagar ${turma}`; new bootstrap.Modal(document.getElementById('modalConfirmarApagarTurma')).show(); };
         document.getElementById('btnConfirmarExclusaoFinal').onclick = async () => {
-            const senha = document.getElementById('senhaApagarTurma').value; if (senha !== logado.senha) return Swal.fire("Erro", "Senha incorreta", "error");
-            try {
-                const q = query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId), where("sala", "==", turmaParaApagarGlobal));
-                const snap = await getDocs(q); const batch = writeBatch(db); snap.forEach(d => batch.delete(d.ref)); await batch.commit();
-                bootstrap.Modal.getInstance(document.getElementById('modalConfirmarApagarTurma')).hide();
-                Swal.fire("Apagado", "Turma removida com sucesso.", "success");
-            } catch (e) { Swal.fire("Erro", "Falha ao excluir.", "error"); }
+            if (document.getElementById('senhaApagarTurma').value !== logado.senha) return Swal.fire("Senha incorreta");
+            const snap = await getDocs(query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId), where("sala", "==", turmaParaApagarGlobal)));
+            const b = writeBatch(db); snap.forEach(d => b.delete(d.ref)); await b.commit();
+            bootstrap.Modal.getInstance(document.getElementById('modalConfirmarApagarTurma')).hide();
         };
 
-        window.abrirCapturaModal = async (id, nome) => { idAlunoCapturaModal = id; document.getElementById('nomeAlunoModal').innerText = nome; new bootstrap.Modal(document.getElementById('modalCapturaRapida')).show(); try { const s = await navigator.mediaDevices.getUserMedia({ video: true }); document.getElementById('videoModal').srcObject = s; } catch (e) {} };
+        window.abrirCapturaModal = async (id, n) => { idAlunoCapturaModal = id; document.getElementById('nomeAlunoModal').innerText = n; new bootstrap.Modal(document.getElementById('modalCapturaRapida')).show(); const s = await navigator.mediaDevices.getUserMedia({ video: true }); document.getElementById('videoModal').srcObject = s; };
         window.fecharModalCaptura = () => { const v = document.getElementById('videoModal'); if(v.srcObject) v.srcObject.getTracks().forEach(t => t.stop()); bootstrap.Modal.getInstance(document.getElementById('modalCapturaRapida')).hide(); };
-        document.getElementById('btnEfetivarFaceModal').onclick = async () => { const v = document.getElementById('videoModal'), st = document.getElementById('statusModal'); st.innerText = "Lendo..."; const det = await faceapi.detectSingleFace(v, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor(); if(!det) return st.innerText = "Erro."; await updateDoc(doc(db, "alunos", idAlunoCapturaModal), { descritor: Array.from(det.descriptor) }); st.innerText = "Salvo!"; setTimeout(() => window.fecharModalCaptura(), 1000); };
-        window.filtrarGestaoFace = () => { const t = document.getElementById('buscaFace').value.toLowerCase(); document.querySelectorAll('#accordionBiometria .item-face').forEach(c => c.style.display = c.getAttribute('data-nome').includes(t) ? '' : 'none'); };
-        window.abrirEdicao = (id, n, s, t) => { document.getElementById('editId').value = id; document.getElementById('editNome').value = n; document.getElementById('editSala').value = s; document.getElementById('editTel').value = t; new bootstrap.Modal(document.getElementById('modalEditAluno')).show(); };
-        window.confirmarEdicao = async () => { await updateDoc(doc(db, "alunos", document.getElementById('editId').value), { nome: document.getElementById('editNome').value, sala: document.getElementById('editSala').value, tel: document.getElementById('editTel').value }); bootstrap.Modal.getInstance(document.getElementById('modalEditAluno')).hide(); };
+        document.getElementById('btnEfetivarFaceModal').onclick = async () => { const det = await faceapi.detectSingleFace(document.getElementById('videoModal'), new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor(); if(det) { await updateDoc(doc(db, "alunos", idAlunoCapturaModal), { descritor: Array.from(det.descriptor) }); window.fecharModalCaptura(); } };
+        
+        window.abrirEdicao = (id, n, s, t, telAlu) => { document.getElementById('editId').value = id; document.getElementById('editNome').value = n; document.getElementById('editSala').value = s; document.getElementById('editTel').value = t; document.getElementById('editTelAluno').value = telAlu; new bootstrap.Modal(document.getElementById('modalEditAluno')).show(); };
+        window.confirmarEdicao = async () => { await updateDoc(doc(db, "alunos", document.getElementById('editId').value), { nome: document.getElementById('editNome').value, sala: document.getElementById('editSala').value, tel: document.getElementById('editTel').value, telefone: document.getElementById('editTelAluno').value }); bootstrap.Modal.getInstance(document.getElementById('modalEditAluno')).hide(); };
+        
         window.del = async (c, i, n) => { if(confirm(`Excluir ${n}?`)) await deleteDoc(doc(db, c, i)); };
         window.logout = async () => { await signOut(auth); localStorage.clear(); window.location.href = 'index.html'; };
 
@@ -575,7 +848,6 @@
             if(chartP) chartP.destroy(); chartP = new Chart(document.getElementById('chartPizza'), { type: 'doughnut', data: { labels: ['Presentes', 'Faltas'], datasets: [{ data: [p, f], backgroundColor: ['#10b981', '#ef4444'] }] }, options: { cutout: '75%', plugins: { legend: { display: false } } } });
             if(chartB) chartB.destroy(); chartB = new Chart(document.getElementById('chartBarras'), { type: 'bar', data: { labels: ['Total', 'Presentes'], datasets: [{ data: [t, p], backgroundColor: ['#003399', '#10b981'] }] }, options: { plugins: { legend: { display: false } } } });
         }
-        window.filtrarAlunos = () => { const t = document.getElementById('buscaA').value.toLowerCase(); document.querySelectorAll('.aluno-row').forEach(tr => tr.style.display = tr.innerText.toLowerCase().includes(t) ? '' : 'none'); };
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
