@@ -127,8 +127,7 @@
                             isProcessing = true;
                             const info = mapaAlunos[nome];
                             const hoje = new Date().toLocaleDateString('pt-BR');
-                            const dataObj = new Date();
-                            const hora = dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                            const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
                             const qPresenca = query(
                                 collection(db, "frequencia"), 
@@ -195,44 +194,53 @@
 
             if (!apiBase || !instanceId || !token) return;
 
-            let num = telefone.replace(/\D/g, '');
-            if (num.length === 11) num = num.substring(0, 2) + num.substring(3);
-            const cleanPhone = "55" + num;
-
-            const baseUrl = apiBase.endsWith('/') ? apiBase : apiBase + '/';
-            const endpoint = `${baseUrl}instances/${instanceId}/token/${token}/send-text`;
+            // Prepara a URL
+            const urlFinal = apiBase.endsWith('/') ? apiBase : apiBase + '/';
+            const endpoint = `${urlFinal}instances/${instanceId}/token/${token}/send-text`;
+            const meusHeaders = { 'Content-Type': 'application/json' };
+            if (securityToken) meusHeaders['Client-Token'] = securityToken;
 
             const mensagem = `*AcessaEdu | Notificação Escolar* 🏫\n\n` +
                              `Olá! Informamos que o(a) aluno(a) *${alunoNome.toUpperCase()}* registrou a entrada na instituição *${escolaNome}*.\n\n` +
                              `📅 *Data:* ${new Date().toLocaleDateString('pt-BR')}\n` +
                              `⏰ *Horário:* ${hora}\n\n` +
-                             `⚠️ _Aviso: Este serviço está em *fase de testes* para melhorarmos a segurança e comunicação com os responsáveis._\n\n` +
+                             `⚠️ _Aviso: Este serviço está em *fase de testes*._\n\n` +
                              `Tenha um ótimo dia! ✨`;
 
-            try {
-                const meusHeaders = { 'Content-Type': 'application/json' };
-                if (securityToken) meusHeaders['Client-Token'] = securityToken;
+            // TENTATIVA 1: Removendo o 9 (Padrão Z-API para números antigos/Business)
+            let numSem9 = telefone.replace(/\D/g, '');
+            if (numSem9.length === 11) numSem9 = numSem9.substring(0, 2) + numSem9.substring(3);
+            
+            // TENTATIVA 2: Número completo (Padrão para números novos)
+            let numCom9 = "55" + telefone.replace(/\D/g, '');
 
+            try {
+                // Tenta enviar para o formato sem o 9 primeiro
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: meusHeaders,
-                    body: JSON.stringify({ phone: cleanPhone, message: mensagem })
+                    body: JSON.stringify({ phone: "55" + numSem9, message: mensagem })
                 });
 
                 const rJson = await response.json();
-                console.log("Resposta Z-API:", rJson);
+                console.log("DEBUG Z-API (Tentativa 1 - Sem 9):", rJson);
 
-                // --- CORREÇÃO DO ERRO AQUI: Verificamos se o elemento existe antes de mudar o texto ---
-                const statusEl = document.getElementById('msg-status');
-                if (statusEl) {
-                    if (response.ok) {
-                        statusEl.innerText = "Notificação enviada ao Responsável! ✅";
-                    } else {
-                        statusEl.innerText = "Presença confirmada! ✅";
-                    }
+                // Se a primeira falhar ou não der sucesso, tenta com o 9
+                if (!response.ok) {
+                    const response2 = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: meusHeaders,
+                        body: JSON.stringify({ phone: numCom9, message: mensagem })
+                    });
+                    const rJson2 = await response2.json();
+                    console.log("DEBUG Z-API (Tentativa 2 - Com 9):", rJson2);
                 }
+
+                const statusEl = document.getElementById('msg-status');
+                if (statusEl) statusEl.innerText = "Notificação enviada ao Responsável! ✅";
+
             } catch (error) {
-                console.error("Erro na conexão com Z-API:", error);
+                console.error("ERRO CRÍTICO Z-API:", error);
                 const statusEl = document.getElementById('msg-status');
                 if (statusEl) statusEl.innerText = "Presença confirmada! ✅";
             }
