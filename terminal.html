@@ -61,7 +61,7 @@
         let ultimoNomeDetectado = ""; 
         let tempoUltimaDeteccao = 0;
         let isProcessing = false;
-        let configEscola = null; // Armazenará os dados da Z-API
+        let configEscola = null;
 
         onAuthStateChanged(auth, (user) => {
             if (user) carregarConfiguracoes();
@@ -71,14 +71,11 @@
         async function carregarConfiguracoes() {
             if(!logado) return;
             try {
-                // Busca os dados da escola (incluindo Z-API)
                 const docRef = doc(db, "unidades", logado.escolaId);
                 const snap = await getDoc(docRef);
                 if(snap.exists()) {
                     configEscola = snap.data();
                     initTerminal();
-                } else {
-                    alert("Erro ao carregar configurações da unidade.");
                 }
             } catch (e) { console.error(e); }
         }
@@ -100,6 +97,7 @@
                 snap.forEach(d => {
                     const data = d.data();
                     if(data.descritor) {
+                        // Mapeia os dados do aluno para uso posterior (incluindo o telefone do responsável)
                         mapaAlunos[data.nome] = { sala: data.sala || "Sem Turma", tel: data.tel || "" };
                         labledDescriptors.push(new faceapi.LabeledFaceDescriptors(data.nome, [new Float32Array(data.descritor)]));
                     }
@@ -125,15 +123,14 @@
 
                         if(match.label !== 'unknown') {
                             const nome = match.label;
-                            // Evita registrar a mesma pessoa em menos de 10 segundos no terminal
                             if(nome === ultimoNomeDetectado && (agora - tempoUltimaDeteccao) < 10000) return;
 
                             isProcessing = true;
                             const info = mapaAlunos[nome];
                             const hoje = new Date().toLocaleDateString('pt-BR');
-                            const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                            const dataObj = new Date();
+                            const hora = dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-                            // Verifica se já bateu o ponto hoje no banco
                             const qPresenca = query(
                                 collection(db, "frequencia"), 
                                 where("nome", "==", nome), 
@@ -153,15 +150,13 @@
                                 return;
                             }
 
-                            // Feedback Visual
                             document.getElementById('display').innerHTML = `
                                 <div class="card-aluno">
                                     <h2 class="fw-bold mb-1">BEM-VINDO(A)</h2>
                                     <p class="mb-0">${nome.toUpperCase()}</p>
-                                    <small class="d-block mt-2" id="msg-status">Processando presença...</small>
+                                    <small class="d-block mt-2" id="msg-status">Sincronizando dados...</small>
                                 </div>`;
 
-                            // Salva no Firebase
                             await addDoc(collection(db, "frequencia"), { 
                                 nome, 
                                 sala: info.sala, 
@@ -171,11 +166,11 @@
                                 dataHora: serverTimestamp() 
                             });
 
-                            // Dispara WhatsApp usando as chaves da escola
-                            if (info.tel) {
-                                await enviarNotificacaoZap(info.tel, nome, hora);
+                            // --- DISPARO AUTOMÁTICO VIA Z-API (ACRESCENTADO) ---
+                            if (configEscola && configEscola.mensagensAtivas && info.tel) {
+                                await enviarNotificacaoZAPI(info.tel, nome, hora, configEscola.nome);
                             } else {
-                                if(document.getElementById('msg-status')) document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
+                                document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
                             }
 
                             ultimoNomeDetectado = nome;
@@ -192,42 +187,41 @@
             isProcessing = false;
         }
 
-        async function enviarNotificacaoZap(telefone, nome, hora) {
-            // Verifica se a escola tem Z-API configurada
-            if (!configEscola || !configEscola.z_instance || !configEscola.z_token) {
-                console.warn("Z-API não configurada para esta escola.");
-                if(document.getElementById('msg-status')) document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
+        // --- FUNÇÃO DE ENVIO AUTOMÁTICO Z-API (ACRESCENTADO) ---
+        async function enviarNotificacaoZAPI(telefone, alunoNome, hora, escolaNome) {
+            const instance = configEscola.zapiInstance;
+            const token = configEscola.zapiToken;
+
+            if (!instance || !token) {
+                document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
                 return;
             }
 
-            const API_URL = `https://api.z-api.io/instances/${configEscola.z_instance}/token/${configEscola.z_token}/send-text`;
-            const CLIENT_TOKEN = configEscola.z_client || "";
+            const cleanPhone = "55" + telefone.replace(/\D/g, '');
+            const endpoint = `https://api.z-api.io/instances/${instance}/token/${token}/send-text`;
 
-            let num = telefone.replace(/\D/g, ''); 
-            if (num.length === 11) num = num.substring(0, 2) + num.substring(3); 
-            if (!num.startsWith('55')) num = '55' + num; 
+            const mensagem = `*AcessaEdu | Notificação Escolar* 🏫\n\n` +
+                             `Olá! Informamos que o(a) aluno(a) *${alunoNome.toUpperCase()}* registrou a entrada na instituição *${escolaNome}*.\n\n` +
+                             `📅 *Data:* ${new Date().toLocaleDateString('pt-BR')}\n` +
+                             `⏰ *Horário:* ${hora}\n\n` +
+                             `⚠️ _Aviso: Este serviço está em *fase de testes* para melhorarmos a segurança e comunicação com os responsáveis._\n\n` +
+                             `Tenha um ótimo dia! ✨`;
 
             try {
-                const response = await fetch(API_URL, {
+                const response = await fetch(endpoint, {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Client-Token': CLIENT_TOKEN
-                    },
-                    body: JSON.stringify({ 
-                        phone: num, 
-                        message: `*${configEscola.nome}:* Confirmamos a entrada do estudante *${nome}* às *${hora}*. ✅` 
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: cleanPhone, message: mensagem })
                 });
-                
-                if(response.ok) {
-                    if(document.getElementById('msg-status')) document.getElementById('msg-status').innerText = "Notificação enviada aos pais! ✅";
+
+                if (response.ok) {
+                    document.getElementById('msg-status').innerText = "Notificação enviada aos pais! ✅";
                 } else {
-                    if(document.getElementById('msg-status')) document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
+                    document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
                 }
-            } catch (e) {
-                console.error("Falha Z-API:", e);
-                if(document.getElementById('msg-status')) document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
+            } catch (error) {
+                console.error("Erro Z-API:", error);
+                document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
             }
         }
     </script>
