@@ -127,7 +127,8 @@
                             isProcessing = true;
                             const info = mapaAlunos[nome];
                             const hoje = new Date().toLocaleDateString('pt-BR');
-                            const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                            const dataObj = new Date();
+                            const hora = dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
                             const qPresenca = query(
                                 collection(db, "frequencia"), 
@@ -194,7 +195,6 @@
 
             if (!apiBase || !instanceId || !token) return;
 
-            // Prepara a URL
             const urlFinal = apiBase.endsWith('/') ? apiBase : apiBase + '/';
             const endpoint = `${urlFinal}instances/${instanceId}/token/${token}/send-text`;
             const meusHeaders = { 'Content-Type': 'application/json' };
@@ -207,42 +207,37 @@
                              `⚠️ _Aviso: Este serviço está em *fase de testes*._\n\n` +
                              `Tenha um ótimo dia! ✨`;
 
-            // TENTATIVA 1: Removendo o 9 (Padrão Z-API para números antigos/Business)
-            let numSem9 = telefone.replace(/\D/g, '');
-            if (numSem9.length === 11) numSem9 = numSem9.substring(0, 2) + numSem9.substring(3);
-            
-            // TENTATIVA 2: Número completo (Padrão para números novos)
-            let numCom9 = "55" + telefone.replace(/\D/g, '');
+            // Limpeza: 55 + DDD + Numero (Trata 11 dígitos removendo o 9 extra)
+            let rawNum = telefone.replace(/\D/g, '');
+            let numParaEnviar = rawNum;
+            if (rawNum.length === 11) numParaEnviar = rawNum.substring(0, 2) + rawNum.substring(3);
+            const cleanPhone = "55" + numParaEnviar;
 
             try {
-                // Tenta enviar para o formato sem o 9 primeiro
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: meusHeaders,
-                    body: JSON.stringify({ phone: "55" + numSem9, message: mensagem })
+                    body: JSON.stringify({ phone: cleanPhone, message: mensagem })
                 });
 
-                const rJson = await response.json();
-                console.log("DEBUG Z-API (Tentativa 1 - Sem 9):", rJson);
+                const rData = await response.json();
+                
+                // --- ACRESCIMO: Log para ler o conteúdo do Object no console ---
+                console.log("DETALHE RESPOSTA Z-API:", rData);
 
-                // Se a primeira falhar ou não der sucesso, tenta com o 9
-                if (!response.ok) {
-                    const response2 = await fetch(endpoint, {
-                        method: 'POST',
-                        headers: meusHeaders,
-                        body: JSON.stringify({ phone: numCom9, message: mensagem })
-                    });
-                    const rJson2 = await response2.json();
-                    console.log("DEBUG Z-API (Tentativa 2 - Com 9):", rJson2);
+                const statusEl = document.getElementById('msg-status');
+                if (statusEl) {
+                    if (response.ok && (rData.item || rData.zaapId || rData.success)) {
+                        statusEl.innerText = "Notificação enviada ao Responsável! ✅";
+                    } else {
+                        statusEl.innerText = "Erro no envio (Verifique o Celular) ⚠️";
+                        console.warn("Z-API recusou, mas a conexão foi feita. Resposta:", rData);
+                    }
                 }
-
-                const statusEl = document.getElementById('msg-status');
-                if (statusEl) statusEl.innerText = "Notificação enviada ao Responsável! ✅";
-
             } catch (error) {
-                console.error("ERRO CRÍTICO Z-API:", error);
+                console.error("ERRO CONEXÃO Z-API:", error);
                 const statusEl = document.getElementById('msg-status');
-                if (statusEl) statusEl.innerText = "Presença confirmada! ✅";
+                if (statusEl) statusEl.innerText = "Falha de comunicação ⚠️";
             }
         }
     </script>
