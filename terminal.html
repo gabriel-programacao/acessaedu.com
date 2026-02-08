@@ -192,16 +192,16 @@
             const token = configEscola.zapiToken;
             const securityToken = configEscola.zapiSecurity;
 
-            if (!apiBase || !instanceId || !token) return;
-
-            // LÓGICA DE LIMPEZA DE URL (CORRIGE O ERRO NOT_FOUND)
-            apiBase = apiBase.trim().replace(/\/+$/, "");
-            if (apiBase.includes("/instances")) {
-                apiBase = apiBase.split("/instances")[0];
+            if (!apiBase || !instanceId || !token) {
+                console.error("Configuração de API incompleta.");
+                return;
             }
-            const endpoint = `${apiBase}/instances/${instanceId}/token/${token}/send-text`;
 
-            // LÓGICA DE LIMPEZA DE NÚMERO
+            // LIMPEZA DA URL: Pega apenas o domínio base para não duplicar rotas
+            let cleanBase = apiBase.trim().split('/instances')[0].replace(/\/+$/, "");
+            const endpoint = `${cleanBase}/instances/${instanceId}/token/${token}/send-text`;
+
+            // LIMPEZA DO NÚMERO
             let num = telefone.replace(/\D/g, '');
             if (num.length === 11) num = num.substring(0, 2) + num.substring(3);
             const cleanPhone = "55" + num;
@@ -210,7 +210,6 @@
                              `Olá! Informamos que o(a) aluno(a) *${alunoNome.toUpperCase()}* registrou a entrada na instituição *${escolaNome}*.\n\n` +
                              `📅 *Data:* ${new Date().toLocaleDateString('pt-BR')}\n` +
                              `⏰ *Horário:* ${hora}\n\n` +
-                             `⚠️ _Aviso: Este serviço está em *fase de testes*._\n\n` +
                              `Tenha um ótimo dia! ✨`;
 
             try {
@@ -223,19 +222,16 @@
                     body: JSON.stringify({ phone: cleanPhone, message: mensagem })
                 });
 
-                const rJson = await response.json();
-                console.log("RESPOSTA Z-API:", rJson);
-
                 const statusEl = document.getElementById('msg-status');
                 if (statusEl) {
                     if (response.ok) {
                         statusEl.innerText = "Notificação enviada ao Responsável! ✅";
                     } else {
-                        statusEl.innerText = "Z-API recusou o envio ⚠️";
+                        statusEl.innerText = "Presença confirmada! (Erro Z-API) ⚠️";
                     }
                 }
             } catch (error) {
-                console.error("Erro na conexão Z-API:", error);
+                console.error("Erro conexão Z-API:", error);
                 const statusEl = document.getElementById('msg-status');
                 if (statusEl) statusEl.innerText = "Presença confirmada! ✅";
             }
