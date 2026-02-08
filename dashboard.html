@@ -453,11 +453,18 @@
         <div id="sec-importar" class="secao">
             <div class="card-premium mx-auto" style="max-width: 700px;">
                 <h5 class="fw-bold mb-4 text-primary"><i class="fas fa-file-import me-2"></i>Importação em Massa</h5>
-                <div class="bg-light p-4 rounded-4 border text-center mb-4"><i class="fas fa-file-excel fa-3x text-success mb-3"></i><h6 class="fw-bold">A: Nome | B: Turma | C: WhatsApp</h6></div>
+                <div class="bg-light p-4 rounded-4 border text-center mb-4">
+                    <i class="fas fa-file-excel fa-3x text-success mb-3"></i>
+                    <h6 class="fw-bold">A: Nome | B: Turma | C: WhatsApp Aluno | D: WhatsApp Resp.</h6>
+                </div>
                 <div class="d-grid gap-3">
                     <input type="file" id="inputPlanilha" class="d-none" accept=".xlsx, .xls, .csv" onchange="window.importarExcel(this)">
                     <button class="btn btn-success py-3 rounded-4 fw-bold" onclick="document.getElementById('inputPlanilha').click()">SELECIONAR PLANILHA</button>
                     <button class="btn btn-outline-primary py-2 rounded-4 fw-bold small" onclick="window.baixarModeloExcel()">BAIXAR MODELO</button>
+                    <hr>
+                    <button class="btn btn-danger py-3 rounded-4 fw-bold shadow-sm" onclick="window.limparTodaBaseAlunos()">
+                        <i class="fas fa-trash-alt me-2"></i>LIMPAR TODA BASE (RESET)
+                    </button>
                 </div>
                 <div id="statusImportacao" class="mt-4 small fw-bold text-center"></div>
             </div>
@@ -588,7 +595,6 @@
             initIA(); escutarDados(); escutarBroadcast();
         }
 
-        // --- SISTEMA DE ALERTA DE COTA (NOVO) ---
         window.alertaCotaAtingida = () => {
             Swal.fire({
                 title: "Limite de Alunos Atingido!",
@@ -607,7 +613,6 @@
             });
         };
 
-        // --- ACRESCIMO: FUNÇÕES FINANCEIRO E SUPORTE ---
         window.solicitarFatura = () => {
             const msg = `Olá Gabriel, sou da escola ${logado.escolaId.toUpperCase()} e gostaria de solicitar a minha fatura.`;
             window.open(`https://api.whatsapp.com/send?phone=5581988300323&text=${encodeURIComponent(msg)}`, '_blank');
@@ -637,7 +642,6 @@
             });
         }
 
-        // CORREÇÃO: Ao fechar o aviso, ativa automaticamente o Painel para evitar tela branca
         window.fecharBroadcast = () => { 
             document.getElementById('broadcast-overlay').style.display = 'none'; 
             window.trocarAba('sec-stats', document.querySelector('.nav-link-pe')); 
@@ -655,14 +659,23 @@
             } catch (e) { return { autorizado: false }; }
         }
 
+        // --- ATUALIZAÇÃO: IMPORTAR 4 COLUNAS ---
         window.importarExcel = async (input) => {
-            const status = document.getElementById('statusImportacao'); const file = input.files[0]; if (!file) return;
-            status.innerText = "Lendo..."; const reader = new FileReader();
+            const status = document.getElementById('statusImportacao'); 
+            const file = input.files[0]; 
+            if (!file) return;
+            
+            status.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando planilha...'; 
+            const reader = new FileReader();
+            
             reader.onload = async (e) => {
-                const data = new Uint8Array(e.target.result); const workbook = XLSX.read(data, { type: 'array' });
+                const data = new Uint8Array(e.target.result); 
+                const workbook = XLSX.read(data, { type: 'array' });
                 const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+                
+                let importados = 0;
                 for (let i = 1; i < json.length; i++) {
-                    const [nome, turma, tel] = json[i];
+                    const [nome, turma, telAlu, telResp] = json[i];
                     if (nome && turma) {
                         const cota = await verificarCotaDisponivel();
                         if(!cota.autorizado) { 
@@ -670,14 +683,56 @@
                             window.alertaCotaAtingida();
                             return; 
                         }
-                        await addDoc(collection(db, "alunos"), { nome: nome.toString(), sala: turma.toString(), escolaId: logado.escolaId, descritor: null, tel: tel ? tel.toString() : "", telefone: "" });
+                        await addDoc(collection(db, "alunos"), { 
+                            nome: nome.toString().trim(), 
+                            sala: turma.toString().trim(), 
+                            escolaId: logado.escolaId, 
+                            descritor: null, 
+                            telefone: telAlu ? telAlu.toString().replace(/\D/g, '') : "", // Celular do Aluno
+                            tel: telResp ? telResp.toString().replace(/\D/g, '') : ""         // Celular do Responsável
+                        });
+                        importados++;
                     }
                 }
-                status.innerText = "Sucesso!";
-            }; reader.readAsArrayBuffer(file);
+                status.innerHTML = `<span class="text-success">Sucesso! ${importados} alunos importados.</span>`;
+                Swal.fire("Concluído", "Base atualizada com sucesso.", "success");
+            }; 
+            reader.readAsArrayBuffer(file);
         };
 
-        window.baixarModeloExcel = () => { const ws = XLSX.utils.aoa_to_sheet([["Nome", "Turma", "WhatsApp"]]); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Modelo"); XLSX.writeFile(wb, "Modelo_Alunos.xlsx"); };
+        // --- ATUALIZAÇÃO: LIMPAR TODA BASE ---
+        window.limparTodaBaseAlunos = async () => {
+            const { value: password } = await Swal.fire({
+                title: '⚠️ APAGAR TUDO?',
+                text: "Isso excluirá TODOS os alunos e biometrias desta unidade. Digite sua senha de gestor para confirmar:",
+                input: 'password',
+                inputPlaceholder: 'Sua senha',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'APAGAR AGORA'
+            });
+
+            if (password === logado.senha) {
+                Swal.fire({ title: 'Aguarde...', text: 'Limpando banco de dados...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+                try {
+                    const q = query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId));
+                    const snap = await getDocs(q);
+                    const batch = writeBatch(db);
+                    snap.forEach(d => batch.delete(d.ref));
+                    await batch.commit();
+                    Swal.fire("Limpeza Concluída", "A base de alunos agora está vazia.", "success");
+                } catch (e) { Swal.fire("Erro", "Falha ao limpar base.", "error"); }
+            } else if (password) {
+                Swal.fire("Senha Incorreta", "", "error");
+            }
+        };
+
+        window.baixarModeloExcel = () => { 
+            const ws = XLSX.utils.aoa_to_sheet([["Nome", "Turma", "WhatsApp Aluno", "WhatsApp Responsavel"]]); 
+            const wb = XLSX.utils.book_new(); 
+            XLSX.utils.book_append_sheet(wb, ws, "Modelo"); 
+            XLSX.writeFile(wb, "Modelo_AcessaEdu_Premium.xlsx"); 
+        };
 
         function montarMenu(libLiberada, msgLiberada) {
             const itens = [
@@ -696,7 +751,6 @@
                 return `<a href="#" class="nav-link-pe" onclick="window.trocarAba('${i.id}', this)"><i class="fas ${i.icon}"></i> ${i.label}</a>`;
             }).join('');
 
-            // Ativa o link do Painel visualmente se não houver broadcast aberto
             if(document.getElementById('broadcast-overlay').style.display !== 'flex') {
                 const primeiroLink = document.querySelector('.nav-link-pe');
                 if(primeiroLink) window.trocarAba('sec-stats', primeiroLink);
@@ -715,74 +769,49 @@
             if(id === 'sec-stats') updateCharts();
         };
 
-        // --- SISTEMA DE RELATÓRIO CORRIGIDO E MELHORADO COM ORDEM ALFABÉTICA ---
         window.gerarRelatorio = async () => {
             const dataSel = document.getElementById('relData').value;
             if(!dataSel) return Swal.fire("Atenção", "Selecione uma data", "warning");
-
             const dataFormatada = new Date(dataSel + 'T00:00:00').toLocaleDateString('pt-BR');
             const turmaSel = document.getElementById('relTurma').value;
-            
             document.getElementById('rel-subtitulo').innerText = `Data: ${dataFormatada} | Turma: ${turmaSel}`;
             const body = document.getElementById('listaRelatorio'); 
             body.innerHTML = '<tr><td colspan="4" class="text-center py-4">Processando lista...</td></tr>';
-            
             try {
                 let qAlunos = query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId));
                 if(turmaSel !== "TODAS") qAlunos = query(qAlunos, where("sala", "==", turmaSel));
                 const snapAlunos = await getDocs(qAlunos);
-                
                 const qFreq = query(collection(db, "frequencia"), where("escolaId", "==", logado.escolaId), where("data", "==", dataFormatada));
                 const snapFreq = await getDocs(qFreq);
-                
                 const mapaPresenca = {};
                 snapFreq.forEach(d => { mapaPresenca[d.data().nome] = d.data().hora; });
-                
-                // --- MELHORIA: TRANSFORMA EM ARRAY E ORDENA ALFABETICAMENTE ---
                 let listaAlunosArr = [];
                 snapAlunos.forEach(d => listaAlunosArr.push(d.data()));
                 listaAlunosArr.sort((a, b) => a.nome.localeCompare(b.nome));
-
                 let html = "";
                 listaAlunosArr.forEach(al => {
                     const pres = mapaPresenca[al.nome];
-                    html += `
-                    <tr>
-                        <td class="ps-4 fw-bold text-uppercase" style="font-size:0.85rem">${al.nome}</td>
-                        <td class="text-muted" style="font-size:0.85rem">${al.sala}</td>
-                        <td class="text-center">
-                            <span class="status-badge ${pres ? 'bg-success text-white' : 'bg-danger text-white'}">
-                                ${pres ? 'PRESENTE' : 'FALTOU'}
-                            </span>
-                        </td>
-                        <td class="text-end pe-4 fw-bold text-primary">${pres || '--:--'}</td>
-                    </tr>`;
+                    html += `<tr><td class="ps-4 fw-bold text-uppercase" style="font-size:0.85rem">${al.nome}</td><td class="text-muted" style="font-size:0.85rem">${al.sala}</td><td class="text-center"><span class="status-badge ${pres ? 'bg-success text-white' : 'bg-danger text-white'}">${pres ? 'PRESENTE' : 'FALTOU'}</span></td><td class="text-end pe-4 fw-bold text-primary">${pres || '--:--'}</td></tr>`;
                 });
                 body.innerHTML = html || '<tr><td colspan="4" class="text-center py-4">Nenhum registro encontrado.</td></tr>';
             } catch (e) { body.innerHTML = '<tr><td colspan="4">Erro ao carregar dados.</td></tr>'; }
         };
 
-        // EXPORTAR EXCEL CORRIGIDO
         window.exportarRelatorioExcel = () => {
             const tabela = document.getElementById('tabela-relatorio');
             const wb = XLSX.utils.table_to_book(tabela, { sheet: "Frequência" });
             XLSX.writeFile(wb, `Relatorio_Frequencia_${logado.escolaId.toUpperCase()}.xlsx`);
         };
 
-        // IMPRIMIR PDF CORRIGIDO
-        window.imprimirRelatorio = () => {
-            window.print();
-        };
+        window.imprimirRelatorio = () => { window.print(); };
 
         document.getElementById('btnSalvar').onclick = async () => {
             const n = document.getElementById('nAluno').value.trim();
             const s = document.getElementById('sAluno').value;
             const v = document.getElementById('webcam');
             if(!n) return Swal.fire("Erro", "Nome obrigatório", "error");
-            
             const cota = await verificarCotaDisponivel(); 
             if(!cota.autorizado) return window.alertaCotaAtingida();
-
             const det = await faceapi.detectSingleFace(v, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
             if(!det) return Swal.fire("Atenção", "Rosto não detectado", "warning");
             await addDoc(collection(db, "alunos"), { nome: n, sala: s, escolaId: logado.escolaId, descritor: Array.from(det.descriptor), tel: document.getElementById('tAluno').value, telefone: document.getElementById('telAluno').value });
@@ -795,10 +824,8 @@
         window.salvarSemBiometria = async () => { 
             const n = document.getElementById('nAluno').value.trim();
             if(!n) return Swal.fire("Erro", "Nome obrigatório", "error");
-
             const cota = await verificarCotaDisponivel(); 
             if(!cota.autorizado) return window.alertaCotaAtingida();
-
             await addDoc(collection(db, "alunos"), { nome: document.getElementById('nAluno').value, sala: document.getElementById('sAluno').value, escolaId: logado.escolaId, descritor: null, tel: document.getElementById('tAluno').value, telefone: document.getElementById('telAluno').value }); 
             Swal.fire("Sucesso!", "Aluno cadastrado com sucesso.", "success");
         };
