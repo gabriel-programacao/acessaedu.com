@@ -97,7 +97,8 @@
                 snap.forEach(d => {
                     const data = d.data();
                     if(data.descritor) {
-                        mapaAlunos[data.nome] = { sala: data.sala || "Sem Turma", tel: data.tel || "" };
+                        // tel = WhatsApp Responsável mapeado para info.telResp
+                        mapaAlunos[data.nome] = { sala: data.sala || "Sem Turma", telResp: data.tel || "" };
                         labledDescriptors.push(new faceapi.LabeledFaceDescriptors(data.nome, [new Float32Array(data.descritor)]));
                     }
                 });
@@ -165,9 +166,9 @@
                                 dataHora: serverTimestamp() 
                             });
 
-                            // --- DISPARO AUTOMÁTICO Z-API COM NOVOS CAMPOS ---
-                            if (configEscola && configEscola.mensagensAtivas && info.tel) {
-                                await enviarNotificacaoZAPI(info.tel, nome, hora, configEscola.nome);
+                            // --- DISPARO AUTOMÁTICO Z-API PARA O RESPONSÁVEL ---
+                            if (configEscola && configEscola.mensagensAtivas && info.telResp) {
+                                await enviarNotificacaoZAPI(info.telResp, nome, hora, configEscola.nome);
                             } else {
                                 document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
                             }
@@ -192,14 +193,19 @@
             const token = configEscola.zapiToken;
             const securityToken = configEscola.zapiSecurity;
 
-            // Valida se as chaves básicas existem
             if (!apiBase || !instanceId || !token) {
                 document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
                 return;
             }
 
-            const cleanPhone = "55" + telefone.replace(/\D/g, '');
-            // Garante que a URL da API termine corretamente para montar o endpoint
+            // LÓGICA DE LIMPEZA E FORMATAÇÃO DO NÚMERO
+            let num = telefone.replace(/\D/g, '');
+            // Se o número tem 11 dígitos (DDD + 9 + número), removemos o '9' para compatibilidade Z-API/WhatsApp
+            if (num.length === 11) {
+                num = num.substring(0, 2) + num.substring(3);
+            }
+            const cleanPhone = "55" + num;
+
             const urlFinal = apiBase.endsWith('/') ? apiBase : apiBase + '/';
             const endpoint = `${urlFinal}instances/${instanceId}/token/${token}/send-text`;
 
@@ -215,13 +221,13 @@
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'Client-Token': securityToken // Token de segurança da conta
+                        'Client-Token': securityToken
                     },
                     body: JSON.stringify({ phone: cleanPhone, message: mensagem })
                 });
 
                 if (response.ok) {
-                    document.getElementById('msg-status').innerText = "Notificação enviada aos pais! ✅";
+                    document.getElementById('msg-status').innerText = "Notificação enviada ao Responsável! ✅";
                 } else {
                     document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
                 }
