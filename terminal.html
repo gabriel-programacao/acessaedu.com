@@ -97,7 +97,6 @@
                 snap.forEach(d => {
                     const data = d.data();
                     if(data.descritor) {
-                        // tel = WhatsApp Responsável mapeado para info.telResp
                         mapaAlunos[data.nome] = { sala: data.sala || "Sem Turma", telResp: data.tel || "" };
                         labledDescriptors.push(new faceapi.LabeledFaceDescriptors(data.nome, [new Float32Array(data.descritor)]));
                     }
@@ -166,11 +165,11 @@
                                 dataHora: serverTimestamp() 
                             });
 
-                            // --- DISPARO AUTOMÁTICO Z-API PARA O RESPONSÁVEL ---
                             if (configEscola && configEscola.mensagensAtivas && info.telResp) {
                                 await enviarNotificacaoZAPI(info.telResp, nome, hora, configEscola.nome);
                             } else {
-                                document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
+                                const el = document.getElementById('msg-status');
+                                if(el) el.innerText = "Presença confirmada! ✅";
                             }
 
                             ultimoNomeDetectado = nome;
@@ -183,7 +182,8 @@
         }
 
         function resetDisplay() {
-            document.getElementById('display').innerHTML = '<p class="fs-4 fw-bold mt-3" style="opacity: 0.8;">Aguardando identificação...</p>'; 
+            const display = document.getElementById('display');
+            if(display) display.innerHTML = '<p class="fs-4 fw-bold mt-3" style="opacity: 0.8;">Aguardando identificação...</p>'; 
             isProcessing = false;
         }
 
@@ -193,21 +193,14 @@
             const token = configEscola.zapiToken;
             const securityToken = configEscola.zapiSecurity;
 
-            if (!apiBase || !instanceId || !token) {
-                document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
-                return;
-            }
+            if (!apiBase || !instanceId || !token) return;
 
-            // LÓGICA DE LIMPEZA E FORMATAÇÃO DO NÚMERO
             let num = telefone.replace(/\D/g, '');
-            // Se o número tem 11 dígitos (DDD + 9 + número), removemos o '9' para compatibilidade Z-API/WhatsApp
-            if (num.length === 11) {
-                num = num.substring(0, 2) + num.substring(3);
-            }
+            if (num.length === 11) num = num.substring(0, 2) + num.substring(3);
             const cleanPhone = "55" + num;
 
-            const urlFinal = apiBase.endsWith('/') ? apiBase : apiBase + '/';
-            const endpoint = `${urlFinal}instances/${instanceId}/token/${token}/send-text`;
+            const baseUrl = apiBase.endsWith('/') ? apiBase : apiBase + '/';
+            const endpoint = `${baseUrl}instances/${instanceId}/token/${token}/send-text`;
 
             const mensagem = `*AcessaEdu | Notificação Escolar* 🏫\n\n` +
                              `Olá! Informamos que o(a) aluno(a) *${alunoNome.toUpperCase()}* registrou a entrada na instituição *${escolaNome}*.\n\n` +
@@ -217,23 +210,31 @@
                              `Tenha um ótimo dia! ✨`;
 
             try {
+                const meusHeaders = { 'Content-Type': 'application/json' };
+                if (securityToken) meusHeaders['Client-Token'] = securityToken;
+
                 const response = await fetch(endpoint, {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Client-Token': securityToken
-                    },
+                    headers: meusHeaders,
                     body: JSON.stringify({ phone: cleanPhone, message: mensagem })
                 });
 
-                if (response.ok) {
-                    document.getElementById('msg-status').innerText = "Notificação enviada ao Responsável! ✅";
-                } else {
-                    document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
+                const rJson = await response.json();
+                console.log("Resposta Z-API:", rJson);
+
+                // --- CORREÇÃO DO ERRO AQUI: Verificamos se o elemento existe antes de mudar o texto ---
+                const statusEl = document.getElementById('msg-status');
+                if (statusEl) {
+                    if (response.ok) {
+                        statusEl.innerText = "Notificação enviada ao Responsável! ✅";
+                    } else {
+                        statusEl.innerText = "Presença confirmada! ✅";
+                    }
                 }
             } catch (error) {
-                console.error("Erro Z-API:", error);
-                document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
+                console.error("Erro na conexão com Z-API:", error);
+                const statusEl = document.getElementById('msg-status');
+                if (statusEl) statusEl.innerText = "Presença confirmada! ✅";
             }
         }
     </script>
