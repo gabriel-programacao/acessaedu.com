@@ -230,10 +230,12 @@
                             <div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="checkBib" onchange="window.recalcularTotal()"> <label class="form-check-label small">Biblioteca (+ R$ 50,00)</label></div>
                             <div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="checkMsg" onchange="window.toggleMensagensExtras()"> <label class="form-check-label small">Mensagens (0,40 p/ aluno)</label></div>
                             
-                            <div id="camposZapi" style="display:none;" class="mt-3 p-2 bg-white rounded-3 border">
-                                <label class="small fw-bold text-success">CONFIGURAÇÃO Z-API</label>
-                                <input type="text" id="nZapiInstance" class="form-control form-control-lux mb-2 py-2" placeholder="ID Instância">
-                                <input type="text" id="nZapiToken" class="form-control form-control-lux py-2" placeholder="Token Z-API">
+                            <div id="camposZapi" style="display:none;" class="mt-3 p-3 bg-white rounded-3 border">
+                                <label class="small fw-bold text-success mb-2">CONFIGURAÇÃO Z-API</label>
+                                <input type="text" id="nZapiApi" class="form-control form-control-lux mb-2 py-2" placeholder="API da Instância">
+                                <input type="text" id="nZapiInstance" class="form-control form-control-lux mb-2 py-2" placeholder="ID da Instância">
+                                <input type="text" id="nZapiToken" class="form-control form-control-lux mb-2 py-2" placeholder="Token da Instância">
+                                <input type="text" id="nZapiSecurity" class="form-control form-control-lux py-2" placeholder="Token de Segurança">
                             </div>
 
                             <div class="mt-2 p-2 bg-white rounded-3 border text-center">
@@ -310,7 +312,7 @@
 
         onAuthStateChanged(auth, user => { if (!user || user.email !== "gabriel.tec.redes@gmail.com") window.location.href = 'index.html'; });
 
-        // --- ACRESCIMO: TOGGLE E RECALCULO ---
+        // --- ACRESCIMO: TOGGLE Z-API ---
         window.toggleMensagensExtras = () => {
             const isChecked = document.getElementById('checkMsg').checked;
             document.getElementById('camposZapi').style.display = isChecked ? 'block' : 'none';
@@ -319,7 +321,6 @@
 
         // CALCULADORA
         window.recalcularTotal = () => {
-            const manut = parseFloat(document.getElementById('nTaxaManut').innerText) || 0; // Usando valor fixo se preferir, ou o input
             const manutVal = parseFloat(document.getElementById('nTaxaManut').value) || 0;
             const cota = parseInt(document.getElementById('nLimite').value) || 0;
             const bib = document.getElementById('checkBib').checked ? 50 : 0;
@@ -358,7 +359,6 @@
             window.atualizarMonitorBroadcast();
         });
 
-        // --- LÓGICA DE BLOQUEIO E AVISO AUTOMÁTICO (CORRIGIDA) ---
         async function verificarPrazosEBloqueios(escola) {
             if(!escola.vencimento || !escola.vencMes || !escola.vencAno) return;
             const hoje = new Date(); hoje.setHours(0,0,0,0);
@@ -366,10 +366,8 @@
             dataVenc.setHours(0,0,0,0);
             const diffTime = dataVenc - hoje;
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
             const docRef = doc(db, "unidades", escola.id, "comunicados", "master");
 
-            // AVISO AUTOMÁTICO: Do 5º dia antes até o atraso de 4 dias
             if(diffDays <= 5 && diffDays > -5) {
                 let novaMsg = `🔔 ATENÇÃO: Seu vencimento é em ${diffDays} dias (${dataVenc.toLocaleDateString('pt-BR')}). Realize o pagamento para evitar bloqueios automáticos.`;
                 if(diffDays === 0) novaMsg = `🚨 HOJE É O DIA DO VENCIMENTO (${dataVenc.toLocaleDateString('pt-BR')}). Regularize para manter o sistema ativo!`;
@@ -381,29 +379,20 @@
                 }
             }
 
-            // TRAVA DE SEGURANÇA: 5 dias após o vencimento
             if(diffDays <= -5 && escola.status === 'Ativo') {
                 await updateDoc(doc(db, "unidades", escola.id), { status: 'Bloqueado' });
                 await setDoc(docRef, { mensagem: `❌ BLOQUEIO: Sistema suspenso por falta de pagamento (Vencido em ${dataVenc.toLocaleDateString('pt-BR')}).`, ativo: true });
             }
         }
 
-        // --- BOTÃO RENOVAR 30 DIAS ---
         window.renovar30Dias = async (id) => {
             const res = await Swal.fire({ title: 'Confirmar Renovação?', text: "O vencimento será adiado em 30 dias.", icon: 'question', showCancelButton: true });
             if(!res.isConfirmed) return;
-            
             const snap = await getDoc(doc(db, "unidades", id));
             const d = snap.data();
             let nD = new Date(d.vencAno, d.vencMes - 1, d.vencimento);
             nD.setMonth(nD.getMonth() + 1);
-
-            await updateDoc(doc(db, "unidades", id), {
-                vencMes: nD.getMonth() + 1,
-                vencAno: nD.getFullYear(),
-                status: 'Ativo'
-            });
-            // Limpa o aviso
+            await updateDoc(doc(db, "unidades", id), { vencMes: nD.getMonth() + 1, vencAno: nD.getFullYear(), status: 'Ativo' });
             await updateDoc(doc(db, "unidades", id, "comunicados", "master"), { ativo: false });
             toast("Assinatura Renovada!");
         };
@@ -437,7 +426,8 @@
         window.resetModal = () => {
             document.getElementById('nID').value = ""; document.getElementById('nID').readOnly = false;
             document.getElementById('nNome').value = ""; document.getElementById('nTurmas').value = "";
-            document.getElementById('nZapiInstance').value = ""; document.getElementById('nZapiToken').value = "";
+            document.getElementById('nZapiApi').value = ""; document.getElementById('nZapiInstance').value = "";
+            document.getElementById('nZapiToken').value = ""; document.getElementById('nZapiSecurity').value = "";
             document.getElementById('checkMsg').checked = false;
             document.getElementById('camposZapi').style.display = 'none';
             window.recalcularTotal();
@@ -458,9 +448,11 @@
             document.getElementById('checkBib').checked = !!e.bibliotecaAtiva;
             document.getElementById('checkMsg').checked = !!e.mensagensAtivas;
             
-            // ACRESCIMO: DADOS Z-API NA EDICAO
+            // ACRESCIMO: DADOS Z-API
+            document.getElementById('nZapiApi').value = e.zapiApi || "";
             document.getElementById('nZapiInstance').value = e.zapiInstance || "";
             document.getElementById('nZapiToken').value = e.zapiToken || "";
+            document.getElementById('nZapiSecurity').value = e.zapiSecurity || "";
             document.getElementById('camposZapi').style.display = e.mensagensAtivas ? 'block' : 'none';
 
             new bootstrap.Modal(document.getElementById('modalNovoCadastro')).show();
@@ -480,8 +472,10 @@
                 bibliotecaAtiva: document.getElementById('checkBib').checked,
                 mensagensAtivas: document.getElementById('checkMsg').checked,
                 // ACRESCIMO: SALVAR Z-API
+                zapiApi: document.getElementById('nZapiApi').value,
                 zapiInstance: document.getElementById('nZapiInstance').value,
-                zapiToken: document.getElementById('nZapiToken').value
+                zapiToken: document.getElementById('nZapiToken').value,
+                zapiSecurity: document.getElementById('nZapiSecurity').value
             };
             if(!document.getElementById('nID').readOnly && document.getElementById('nEmail').value) {
                 try {
@@ -495,7 +489,6 @@
             toast("Sincronizado!");
         };
 
-        // GESTÃO OPERADORES
         window.abrirGerenciamento = async (id) => { escolaAtualId = id; window.carregarUsuarios(); new bootstrap.Modal(document.getElementById('modalEscola')).show(); };
         window.carregarUsuarios = async () => {
             const snap = await getDocs(query(collection(db, "logins"), where("escolaId", "==", escolaAtualId)));

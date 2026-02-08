@@ -97,7 +97,6 @@
                 snap.forEach(d => {
                     const data = d.data();
                     if(data.descritor) {
-                        // Mapeia os dados do aluno para uso posterior (incluindo o telefone do responsável)
                         mapaAlunos[data.nome] = { sala: data.sala || "Sem Turma", tel: data.tel || "" };
                         labledDescriptors.push(new faceapi.LabeledFaceDescriptors(data.nome, [new Float32Array(data.descritor)]));
                     }
@@ -154,7 +153,7 @@
                                 <div class="card-aluno">
                                     <h2 class="fw-bold mb-1">BEM-VINDO(A)</h2>
                                     <p class="mb-0">${nome.toUpperCase()}</p>
-                                    <small class="d-block mt-2" id="msg-status">Sincronizando dados...</small>
+                                    <small class="d-block mt-2" id="msg-status">Sincronizando presença...</small>
                                 </div>`;
 
                             await addDoc(collection(db, "frequencia"), { 
@@ -166,7 +165,7 @@
                                 dataHora: serverTimestamp() 
                             });
 
-                            // --- DISPARO AUTOMÁTICO VIA Z-API (ACRESCENTADO) ---
+                            // --- DISPARO AUTOMÁTICO Z-API COM NOVOS CAMPOS ---
                             if (configEscola && configEscola.mensagensAtivas && info.tel) {
                                 await enviarNotificacaoZAPI(info.tel, nome, hora, configEscola.nome);
                             } else {
@@ -183,22 +182,26 @@
         }
 
         function resetDisplay() {
-            document.getElementById('display').innerHTML = '<p class="fs-4 fw-bold mt-3" style="opacity: 0.8;">Posicione seu rosto para identificação</p>'; 
+            document.getElementById('display').innerHTML = '<p class="fs-4 fw-bold mt-3" style="opacity: 0.8;">Aguardando identificação...</p>'; 
             isProcessing = false;
         }
 
-        // --- FUNÇÃO DE ENVIO AUTOMÁTICO Z-API (ACRESCENTADO) ---
         async function enviarNotificacaoZAPI(telefone, alunoNome, hora, escolaNome) {
-            const instance = configEscola.zapiInstance;
+            const apiBase = configEscola.zapiApi; 
+            const instanceId = configEscola.zapiInstance;
             const token = configEscola.zapiToken;
+            const securityToken = configEscola.zapiSecurity;
 
-            if (!instance || !token) {
+            // Valida se as chaves básicas existem
+            if (!apiBase || !instanceId || !token) {
                 document.getElementById('msg-status').innerText = "Presença confirmada! ✅";
                 return;
             }
 
             const cleanPhone = "55" + telefone.replace(/\D/g, '');
-            const endpoint = `https://api.z-api.io/instances/${instance}/token/${token}/send-text`;
+            // Garante que a URL da API termine corretamente para montar o endpoint
+            const urlFinal = apiBase.endsWith('/') ? apiBase : apiBase + '/';
+            const endpoint = `${urlFinal}instances/${instanceId}/token/${token}/send-text`;
 
             const mensagem = `*AcessaEdu | Notificação Escolar* 🏫\n\n` +
                              `Olá! Informamos que o(a) aluno(a) *${alunoNome.toUpperCase()}* registrou a entrada na instituição *${escolaNome}*.\n\n` +
@@ -210,7 +213,10 @@
             try {
                 const response = await fetch(endpoint, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Client-Token': securityToken // Token de segurança da conta
+                    },
                     body: JSON.stringify({ phone: cleanPhone, message: mensagem })
                 });
 
