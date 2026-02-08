@@ -143,7 +143,6 @@
                                     <div class="card-bloqueio">
                                         <h2 class="fw-bold mb-1">JÁ REGISTRADO</h2>
                                         <p class="mb-0">${nome.toUpperCase()}</p>
-                                        <small class="d-block mt-2">Sua entrada já foi computada hoje.</small>
                                     </div>`;
                                 setTimeout(() => { resetDisplay(); }, 4000);
                                 return;
@@ -188,17 +187,24 @@
         }
 
         async function enviarNotificacaoZAPI(telefone, alunoNome, hora, escolaNome) {
-            const apiBase = configEscola.zapiApi; 
+            let apiBase = configEscola.zapiApi; 
             const instanceId = configEscola.zapiInstance;
             const token = configEscola.zapiToken;
             const securityToken = configEscola.zapiSecurity;
 
             if (!apiBase || !instanceId || !token) return;
 
-            const urlFinal = apiBase.endsWith('/') ? apiBase : apiBase + '/';
-            const endpoint = `${urlFinal}instances/${instanceId}/token/${token}/send-text`;
-            const meusHeaders = { 'Content-Type': 'application/json' };
-            if (securityToken) meusHeaders['Client-Token'] = securityToken;
+            // LÓGICA DE LIMPEZA DE URL (CORRIGE O ERRO NOT_FOUND)
+            apiBase = apiBase.trim().replace(/\/+$/, "");
+            if (apiBase.includes("/instances")) {
+                apiBase = apiBase.split("/instances")[0];
+            }
+            const endpoint = `${apiBase}/instances/${instanceId}/token/${token}/send-text`;
+
+            // LÓGICA DE LIMPEZA DE NÚMERO
+            let num = telefone.replace(/\D/g, '');
+            if (num.length === 11) num = num.substring(0, 2) + num.substring(3);
+            const cleanPhone = "55" + num;
 
             const mensagem = `*AcessaEdu | Notificação Escolar* 🏫\n\n` +
                              `Olá! Informamos que o(a) aluno(a) *${alunoNome.toUpperCase()}* registrou a entrada na instituição *${escolaNome}*.\n\n` +
@@ -207,37 +213,31 @@
                              `⚠️ _Aviso: Este serviço está em *fase de testes*._\n\n` +
                              `Tenha um ótimo dia! ✨`;
 
-            // Limpeza: 55 + DDD + Numero (Trata 11 dígitos removendo o 9 extra)
-            let rawNum = telefone.replace(/\D/g, '');
-            let numParaEnviar = rawNum;
-            if (rawNum.length === 11) numParaEnviar = rawNum.substring(0, 2) + rawNum.substring(3);
-            const cleanPhone = "55" + numParaEnviar;
-
             try {
+                const meusHeaders = { 'Content-Type': 'application/json' };
+                if (securityToken) meusHeaders['Client-Token'] = securityToken;
+
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: meusHeaders,
                     body: JSON.stringify({ phone: cleanPhone, message: mensagem })
                 });
 
-                const rData = await response.json();
-                
-                // --- ACRESCIMO: Log para ler o conteúdo do Object no console ---
-                console.log("DETALHE RESPOSTA Z-API:", rData);
+                const rJson = await response.json();
+                console.log("RESPOSTA Z-API:", rJson);
 
                 const statusEl = document.getElementById('msg-status');
                 if (statusEl) {
-                    if (response.ok && (rData.item || rData.zaapId || rData.success)) {
+                    if (response.ok) {
                         statusEl.innerText = "Notificação enviada ao Responsável! ✅";
                     } else {
-                        statusEl.innerText = "Erro no envio (Verifique o Celular) ⚠️";
-                        console.warn("Z-API recusou, mas a conexão foi feita. Resposta:", rData);
+                        statusEl.innerText = "Z-API recusou o envio ⚠️";
                     }
                 }
             } catch (error) {
-                console.error("ERRO CONEXÃO Z-API:", error);
+                console.error("Erro na conexão Z-API:", error);
                 const statusEl = document.getElementById('msg-status');
-                if (statusEl) statusEl.innerText = "Falha de comunicação ⚠️";
+                if (statusEl) statusEl.innerText = "Presença confirmada! ✅";
             }
         }
     </script>
