@@ -117,6 +117,9 @@
                     <div class="d-flex align-items-center gap-3">
                         <h4 class="fw-bold m-0">Catálogo Geral</h4>
                         <input type="text" class="search-bar-elite" id="searchAcervo" placeholder="Buscar livro ou autor..." onkeyup="window.filterTable('listaLivrosAcervo', this.value)">
+                        <button class="btn btn-outline-primary rounded-pill px-3 fw-bold" onclick="window.unificarAcervoDuplicado()" title="Mesclar livros com mesmo nome e autor">
+                            <i class="fas fa-compress-arrows-alt me-1"></i> UNIFICAR
+                        </button>
                     </div>
                     <button class="btn btn-dark rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#modalNovoLivro">+ NOVO LIVRO</button>
                 </div>
@@ -154,10 +157,11 @@
     <div class="modal fade" id="modalNovoLivro" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><h3 class="modal-title-lux">Novo Exemplar</h3><input type="text" id="n-liv-tit" class="form-control-lux" placeholder="Título da Obra"><input type="text" id="n-liv-aut" class="form-control-lux" placeholder="Autor"><input type="number" id="n-liv-qtd" class="form-control-lux" placeholder="Quantidade em Estoque"><button id="btnSalvarLivro" class="btn-infinity">CADASTRAR</button></div></div></div>
     <div class="modal fade" id="modalEditarEmprestimo" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><h3 class="modal-title-lux">Gerenciar Prazo</h3><input type="hidden" id="edit-emp-id"><input type="text" id="edit-emp-aluno" class="form-control-lux bg-light" readonly><input type="date" id="edit-emp-data" class="form-control-lux"><button id="btnUpdateEmp" class="btn-infinity">ATUALIZAR DATA</button><button onclick="window.renovarRapido()" class="btn btn-outline-warning w-100 mt-3 border-0 fw-bold">RENOVAR +7 DIAS</button></div></div></div>
     <div class="modal fade" id="modalImportar" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><h3 class="modal-title-lux">Importar Acervo</h3><button onclick="window.baixarModelo()" class="btn btn-outline-success w-100 py-3 mb-4 rounded-4 fw-bold">BAIXAR PLANILHA MODELO</button><div class="import-drop-zone p-5 text-center rounded-5 bg-light" style="border: 2px dashed #ccc" onclick="document.getElementById('file-excel').click()"><i class="fas fa-file-excel fa-4x text-success mb-3"></i><p>Selecione o arquivo extraído</p><input type="file" id="file-excel" class="d-none" accept=".xlsx, .xls"></div><button id="btnProcessarExcel" class="btn-infinity mt-4">IMPORTAR AGORA</button></div></div></div>
+    <div class="modal fade" id="modalEditarLivro" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><h3 class="modal-title-lux">Editar Obra</h3><input type="hidden" id="edit-liv-id"><input type="text" id="edit-liv-tit" class="form-control-lux" placeholder="Título da Obra"><input type="text" id="edit-liv-aut" class="form-control-lux" placeholder="Autor"><input type="number" id="edit-liv-qtd" class="form-control-lux" placeholder="Quantidade em Estoque"><button id="btnUpdateLivro" class="btn-infinity">SALVAR ALTERAÇÕES</button></div></div></div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, query, where, increment, getDoc, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, query, where, increment, getDoc, serverTimestamp, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         
         const firebaseConfig = { apiKey: "AIzaSyDgR98RtL8sgxVbEV2Swyb2wnHLSPt3cDo", authDomain: "escolapro-15e5e.firebaseapp.com", projectId: "escolapro-15e5e", storageBucket: "escolapro-15e5e.firebasestorage.app", messagingSenderId: "339019791514", appId: "1:339019791514:web:44e0d58b6835f0fe6df323" };
@@ -235,7 +239,6 @@
             if(v.length < 2) { res.style.display = 'none'; return; }
             let h = "";
             cacheAlunos.filter(a => a.nome.toLowerCase().includes(v.toLowerCase())).forEach(a => {
-                // Pega tanto 'telefone' quanto 'tel' do cadastro para validar se tem número
                 const temNum = !!(a.telefone || a.tel);
                 h += `<div class="search-item" onclick="window.selectAlu('${a.id}','${a.nome}','${a.sala}', '${temNum ? (a.telefone || a.tel) : ''}')"><span class="item-title">${a.nome} ${!temNum ? '<i class="fas fa-exclamation-circle text-danger ms-2"></i>' : ''}</span><span class="item-subtitle">${a.sala}</span></div>`;
             });
@@ -270,11 +273,41 @@
         };
 
         document.getElementById('btnSalvarLivro').onclick = async () => {
-            const t = document.getElementById('n-liv-tit').value, a = document.getElementById('n-liv-aut').value, q = parseInt(document.getElementById('n-liv-qtd').value);
-            if(!t || isNaN(q)) return;
-            await addDoc(collection(db, "livros"), { titulo: t, autor: a, quantidade: q, escolaId: logado.escolaId });
-            bootstrap.Modal.getInstance(document.getElementById('modalNovoLivro')).hide();
-            Swal.fire("Obra Catalogada", "O livro foi adicionado ao acervo.", "success");
+            const t = document.getElementById('n-liv-tit').value.trim();
+            const a = document.getElementById('n-liv-aut').value.trim();
+            const q = parseInt(document.getElementById('n-liv-qtd').value);
+            if(!t || isNaN(q)) return Swal.fire("Atenção", "Preencha título e quantidade", "warning");
+
+            try {
+                const qExistente = query(collection(db, "livros"), 
+                    where("escolaId", "==", logado.escolaId),
+                    where("titulo", "==", t),
+                    where("autor", "==", a)
+                );
+                const snapExistente = await getDocs(qExistente);
+
+                if(!snapExistente.empty) {
+                    const docExistente = snapExistente.docs[0];
+                    const dadosAtuais = docExistente.data();
+                    const res = await Swal.fire({
+                        title: "Obra já Cadastrada",
+                        html: `O livro <b>${t}</b> já existe no acervo com <b>${dadosAtuais.quantidade}</b> exemplares.<br><br>Deseja somar mais <b>${q}</b> unidades ao estoque atual?`,
+                        icon: "info",
+                        showCancelButton: true,
+                        confirmButtonText: "Sim, somar",
+                        cancelButtonText: "Cancelar"
+                    });
+                    if(res.isConfirmed) {
+                        await updateDoc(doc(db, "livros", docExistente.id), { quantidade: increment(q) });
+                        bootstrap.Modal.getInstance(document.getElementById('modalNovoLivro')).hide();
+                        Swal.fire("Estoque Atualizado", "Unidades somadas!", "success");
+                    }
+                } else {
+                    await addDoc(collection(db, "livros"), { titulo: t, autor: a, quantidade: q, escolaId: logado.escolaId });
+                    bootstrap.Modal.getInstance(document.getElementById('modalNovoLivro')).hide();
+                    Swal.fire("Obra Catalogada", "O livro foi adicionado.", "success");
+                }
+            } catch (e) { console.error(e); }
         };
 
         document.getElementById('btnConfirmarEmp').onclick = async () => {
@@ -288,13 +321,12 @@
                     where("escolaId", "==", logado.escolaId)
                 );
                 const snapAtivos = await getDocs(qAtivos);
-                const totalEmprestimos = snapAtivos.size;
                 const agora = Date.now();
                 let temAtraso = false;
                 snapAtivos.forEach(doc => { if (agora > doc.data().timestampDev) temAtraso = true; });
 
                 if (temAtraso) return Swal.fire({ icon: 'error', title: 'Empréstimo Bloqueado', text: 'Este estudante possui livros em ATRASO.', confirmButtonColor: '#d33' });
-                if (totalEmprestimos >= 3) return Swal.fire({ icon: 'error', title: 'Limite Atingido', text: 'Este estudante já possui 3 livros em mãos.', confirmButtonColor: '#d33' });
+                if (snapAtivos.size >= 3) return Swal.fire({ icon: 'error', title: 'Limite Atingido', text: 'Este estudante já possui 3 livros em mãos.', confirmButtonColor: '#d33' });
 
                 const infoAlu = document.getElementById('inp-alu').value.split(' | ');
                 const dataObj = new Date(dat + "T12:00:00");
@@ -308,14 +340,8 @@
                 await updateDoc(doc(db, "livros", lid), { quantidade: increment(-1) });
                 bootstrap.Modal.getInstance(document.getElementById('modalEmprestimo')).hide();
 
-                // AVISO DE DADOS AUSENTES SE ESTIVER SEM TELEFONE
                 if(!tel) {
-                    Swal.fire({
-                        title: "Empréstimo Concluído!",
-                        html: `<div class="text-danger fw-bold">ALERTA DE CADASTRO:</div><br><b>${infoAlu[0]}</b>, favor procurar <b>Gabriel na secretaria</b> para atualizar seus dados de contato.`,
-                        icon: "warning",
-                        confirmButtonText: "ENTENDIDO"
-                    });
+                    Swal.fire({ title: "Empréstimo Concluído!", html: `<div class="text-danger fw-bold">ALERTA DE CADASTRO:</div><br><b>${infoAlu[0]}</b>, favor procurar <b>Gabriel na secretaria</b> para atualizar seus dados.`, icon: "warning" });
                 } else {
                     Swal.fire("Saída Registrada", "Empréstimo concluído.", "success");
                 }
@@ -360,25 +386,12 @@
         };
 
         window.enviarZap = async (tel, n, l, dataDev, eid = null) => {
-            if(!tel) return Swal.fire({
-                title: "Cadastro Incompleto",
-                text: `${n} deve procurar Gabriel na secretaria para atualizar o telefone de contato.`,
-                icon: "error"
-            });
-
-            const msg = `*AcessaEdu | Biblioteca* 📚\n\n` +
-                         `Olá, *${n.split(' ')[0]}*! Tudo bem?\n\n` +
-                         `Passando para lembrar que o livro *"${l}"* estava com a data de devolução prevista para o dia *${dataDev}*.\n\n` +
-                         `Caso precise de mais tempo para concluir a leitura, por favor, procure *Giselda na parte da tarde* para realizar a renovação do seu exemplar. ✅\n\n` +
-                         `Se já realizou a devolução hoje, favor desconsiderar esta mensagem. ✨`;
-            
+            if(!tel) return Swal.fire({ title: "Cadastro Incompleto", text: `${n} deve procurar Gabriel na secretaria.`, icon: "error" });
+            const msg = `*AcessaEdu | Biblioteca* 📚\n\nOlá, *${n.split(' ')[0]}*!\nPassando para lembrar que o livro *"${l}"* venceu em *${dataDev}*.\nCaso precise renovar, procure *Giselda na parte da tarde*. ✅`;
             if(configUnidade && configUnidade.mensagensAtivas && eid) {
                 const sucesso = await window.processarZapi(tel, msg);
-                if(sucesso) {
-                    await updateDoc(doc(db, "emprestimos", eid), { ultimoEnvioZap: new Date().toLocaleDateString('pt-BR') });
-                    return true;
-                }
-                return false;
+                if(sucesso) await updateDoc(doc(db, "emprestimos", eid), { ultimoEnvioZap: new Date().toLocaleDateString('pt-BR') });
+                return sucesso;
             } else {
                 window.open(`https://api.whatsapp.com/send?phone=55${tel.replace(/\D/g,'')}&text=${window.encodeURIComponent(msg)}`, '_blank');
                 if(eid) await updateDoc(doc(db, "emprestimos", eid), { ultimoEnvioZap: new Date().toLocaleDateString('pt-BR') });
@@ -393,12 +406,7 @@
                 if (num.length === 11) num = num.substring(0, 2) + num.substring(3);
                 const headers = { 'Content-Type': 'application/json' };
                 if (configUnidade.zapiSecurity) headers['Client-Token'] = configUnidade.zapiSecurity;
-
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify({ phone: "55" + num, message: msg, delayMessage: 10, delayTyping: 5 })
-                });
+                const response = await fetch(endpoint, { method: 'POST', headers: headers, body: JSON.stringify({ phone: "55" + num, message: msg, delayMessage: 10, delayTyping: 5 }) });
                 return response.ok;
             } catch (e) { return false; }
         };
@@ -410,74 +418,129 @@
             const snap = await getDocs(q);
             const agora = Date.now();
             let enviados = 0;
-
-            const listaParaCobrar = [];
-            snap.forEach(d => {
-                const e = d.data();
-                // Considera apenas quem tem telefone para o disparo em massa automático
-                if(agora > e.timestampDev && e.ultimoEnvioZap !== hoje && e.alunoTel) {
-                    listaParaCobrar.push({id: d.id, ...e});
-                }
-            });
-
-            if(listaParaCobrar.length === 0) return Swal.fire("Tudo em dia!", "Nenhuma pendência nova para cobrar automaticamente hoje.", "info");
-
-            const confirm = await Swal.fire({
-                title: 'Iniciar Cobrança?',
-                text: `Serão enviadas ${listaParaCobrar.length} mensagens. Alunos sem número serão ignorados no disparo automático.`,
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonText: 'Sim, disparar'
-            });
-
+            const lista = [];
+            snap.forEach(d => { const e = d.data(); if(agora > e.timestampDev && e.ultimoEnvioZap !== hoje && e.alunoTel) lista.push({id: d.id, ...e}); });
+            if(lista.length === 0) return Swal.fire("Tudo em dia!", "Nenhuma pendência nova.", "info");
+            const confirm = await Swal.fire({ title: 'Iniciar Cobrança?', text: `Disparar ${lista.length} mensagens?`, icon: 'question', showCancelButton: true });
             if(!confirm.isConfirmed) return;
-
             statusTxt.innerText = "Preparando disparos...";
-            for (const e of listaParaCobrar) {
-                statusTxt.innerText = `[${enviados+1}/${listaParaCobrar.length}] Enviando para: ${e.alunoNome}...`;
+            for (const e of lista) {
+                statusTxt.innerText = `Enviando para: ${e.alunoNome}...`;
                 const ok = await window.enviarZap(e.alunoTel, e.alunoNome, e.livroTitulo, e.dataDev, e.id);
                 if(ok) enviados++;
                 await new Promise(r => setTimeout(r, 2000)); 
             }
             statusTxt.innerText = `Concluído! ${enviados} mensagens enviadas.`;
-            Swal.fire("Finalizado", `${enviados} mensagens enviadas com sucesso.`, "success");
+            Swal.fire("Finalizado", `${enviados} mensagens enviadas.`, "success");
+        };
+
+        window.abrirEditarLivro = async (id) => {
+            const d = (await getDoc(doc(db, "livros", id))).data();
+            document.getElementById('edit-liv-id').value = id;
+            document.getElementById('edit-liv-tit').value = d.titulo;
+            document.getElementById('edit-liv-aut').value = d.autor;
+            document.getElementById('edit-liv-qtd').value = d.quantidade;
+            new bootstrap.Modal(document.getElementById('modalEditarLivro')).show();
+        };
+
+        document.getElementById('btnUpdateLivro').onclick = async () => {
+            const id = document.getElementById('edit-liv-id').value, t = document.getElementById('edit-liv-tit').value.trim(), a = document.getElementById('edit-liv-aut').value.trim(), q = parseInt(document.getElementById('edit-liv-qtd').value);
+            if(!t || isNaN(q)) return;
+            await updateDoc(doc(db, "livros", id), { titulo: t, autor: a, quantidade: q });
+            bootstrap.Modal.getInstance(document.getElementById('modalEditarLivro')).hide();
+            Swal.fire("Atualizado", "As informações foram salvas.", "success");
+        };
+
+        window.confirmarApagarLivro = async (id, titulo) => {
+            const res = await Swal.fire({ title: 'Tem certeza?', text: `Deseja apagar "${titulo}"?`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33' });
+            if(res.isConfirmed) { await deleteDoc(doc(db, "livros", id)); Swal.fire("Apagado!", "", "success"); }
+        };
+
+        // --- ACRÉSCIMO: LÓGICA DE UNIFICAÇÃO DE DUPLICADOS NO BANCO ---
+        window.unificarAcervoDuplicado = async () => {
+            const res = await Swal.fire({
+                title: 'Unificar Acervo?',
+                text: "O sistema irá procurar livros com mesmo nome e autor e somar as quantidades em um único registro. Esta ação é definitiva.",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Sim, unificar tudo',
+                cancelButtonText: 'Cancelar'
+            });
+
+            if(!res.isConfirmed) return;
+
+            Swal.fire({ title: 'Processando...', text: 'Organizando prateleiras...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+
+            try {
+                const q = query(collection(db, "livros"), where("escolaId", "==", logado.escolaId));
+                const snap = await getDocs(q);
+                const mapaUnificacao = {}; // { "nome_autor": { idPrincipal, totalQtd, clonesIds: [] } }
+
+                snap.forEach(docSnap => {
+                    const data = docSnap.data();
+                    const chave = `${data.titulo.trim().toLowerCase()}_${data.autor.trim().toLowerCase()}`;
+                    
+                    if(!mapaUnificacao[chave]) {
+                        mapaUnificacao[chave] = { idPrincipal: docSnap.id, totalQtd: data.quantidade, clonesIds: [] };
+                    } else {
+                        mapaUnificacao[chave].totalQtd += data.quantidade;
+                        mapaUnificacao[chave].clonesIds.push(docSnap.id);
+                    }
+                });
+
+                const batch = writeBatch(db);
+                let alteracoes = 0;
+
+                for (let chave in mapaUnificacao) {
+                    const item = mapaUnificacao[chave];
+                    if(item.clonesIds.length > 0) {
+                        // Atualiza o principal com a soma total
+                        batch.update(doc(db, "livros", item.idPrincipal), { quantidade: item.totalQtd });
+                        // Deleta os clones
+                        item.clonesIds.forEach(idClone => {
+                            batch.delete(doc(db, "livros", idClone));
+                        });
+                        alteracoes++;
+                    }
+                }
+
+                if(alteracoes > 0) {
+                    await batch.commit();
+                    Swal.fire("Sucesso!", `O acervo foi organizado. ${alteracoes} obras duplicadas foram unificadas.`, "success");
+                } else {
+                    Swal.fire("Tudo OK", "Não foram encontrados livros duplicados no seu acervo.", "info");
+                }
+
+            } catch (e) {
+                console.error(e);
+                Swal.fire("Erro", "Falha ao unificar acervo.", "error");
+            }
         };
 
         function initApp() {
-            onSnapshot(query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId)), snap => { 
-                cacheAlunos = []; snap.forEach(d => cacheAlunos.push({id: d.id, ...d.data()})); 
-            });
-
+            onSnapshot(query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId)), snap => { cacheAlunos = []; snap.forEach(d => cacheAlunos.push({id: d.id, ...d.data()})); });
             onSnapshot(query(collection(db, "livros"), where("escolaId", "==", logado.escolaId)), snap => {
                 let tb = "", tot = 0; cacheLivros = [];
                 snap.forEach(d => {
                     const b = d.data(); tot += b.quantidade; cacheLivros.push({id: d.id, ...b});
-                    tb += `<tr><td><span class="item-title">${b.titulo}</span><span class="item-subtitle">${b.autor}</span></td><td class="text-center"><span class="badge ${b.quantidade > 0 ? 'bg-light text-primary' : 'bg-danger-subtle text-danger'} rounded-pill px-3 py-2 fw-bold">${b.quantidade} UN</span></td><td class="text-end"><button class="btn btn-sm btn-light text-danger rounded-circle" onclick="deleteDoc(doc(db,'livros','${d.id}'))"><i class="fas fa-trash"></i></button></td></tr>`;
+                    tb += `<tr><td><span class="item-title">${b.titulo}</span><span class="item-subtitle">${b.autor}</span></td><td class="text-center"><span class="badge ${b.quantidade > 0 ? 'bg-light text-primary' : 'bg-danger-subtle text-danger'} rounded-pill px-3 py-2 fw-bold">${b.quantidade} UN</span></td><td class="text-end"><button class="btn btn-sm btn-light text-primary rounded-circle me-1" onclick="window.abrirEditarLivro('${d.id}')"><i class="fas fa-edit"></i></button><button class="btn btn-sm btn-light text-danger rounded-circle" onclick="window.confirmarApagarLivro('${d.id}', '${b.titulo.replace(/'/g, "\\'")}')"><i class="fas fa-trash"></i></button></td></tr>`;
                 });
                 document.getElementById('listaLivrosAcervo').innerHTML = tb; document.getElementById('st-total').innerText = tot;
+                window.filterTable('listaLivrosAcervo', document.getElementById('searchAcervo').value);
             });
-
             onSnapshot(query(collection(db, "emprestimos"), where("escolaId", "==", logado.escolaId), where("status", "==", "Ativo")), snap => {
                 let rec = "", atr = "", ca = 0, cat = 0, ag = Date.now(), tMap = {}, hoje = new Date().toLocaleDateString('pt-BR');
                 snap.forEach(d => {
                     const e = {id: d.id, ...d.data()}; const isA = ag > e.timestampDev; ca++; if(isA) cat++;
                     const alunoAtual = cacheAlunos.find(a => a.id === e.alunoId);
-                    
-                    // Prioriza o telefone do cadastro mais recente
                     const telAtualizado = alunoAtual ? (alunoAtual.telefone || alunoAtual.tel || e.alunoTel) : e.alunoTel;
-                    
-                    const dias = Math.ceil((e.timestampDev - ag) / 86400000);
                     const jaCobradoHj = e.ultimoEnvioZap === hoje;
-
-                    const row = `<tr><td><span class="item-title">${e.alunoNome}</span></td><td><b>${e.livroTitulo}</b></td><td>${e.dataDev} ${isA?'<span class="badge bg-danger">ATRASADO</span>':`<span class="badge bg-light text-dark">${dias} dias</span>`}</td><td><div class="d-flex gap-2"><button class="btn btn-sm btn-success rounded-pill px-3" onclick="window.darBaixa('${e.id}','${e.livroId}')">Baixa</button><button class="btn btn-sm btn-light rounded-pill px-3" onclick="window.abrirGestao('${e.id}')">Gerenciar</button></div></td></tr>`;
+                    const row = `<tr><td><span class="item-title">${e.alunoNome}</span></td><td><b>${e.livroTitulo}</b></td><td>${e.dataDev} ${isA?'<span class="badge bg-danger">ATRASADO</span>':`<span class="badge bg-light text-dark">${Math.ceil((e.timestampDev - ag) / 86400000)} dias</span>`}</td><td><div class="d-flex gap-2"><button class="btn btn-sm btn-success rounded-pill px-3" onclick="window.darBaixa('${e.id}','${e.livroId}')">Baixa</button><button class="btn btn-sm btn-light rounded-pill px-3" onclick="window.abrirGestao('${e.id}')">Gerenciar</button></div></td></tr>`;
                     rec += `<tr><td><span class="item-title">${e.alunoNome}</span><span class="item-subtitle">${e.alunoSala}</span></td><td><b>${e.livroTitulo}</b></td><td>${e.dataDev}</td></tr>`;
                     if(!tMap[e.alunoSala]) tMap[e.alunoSala] = ""; tMap[e.alunoSala] += row;
-                    
                     if(isA) {
                         const btnClass = telAtualizado ? (jaCobradoHj ? 'btn-light' : 'btn-success') : 'btn-danger';
-                        const btnText = telAtualizado ? (jaCobradoHj ? 'COBRADO' : 'COBRAR') : 'SEM NÚMERO';
-                        
-                        atr += `<tr><td><span class="item-title">${e.alunoNome}</span><span class="item-subtitle">${e.alunoSala}</span></td><td><b>${e.livroTitulo}</b></td><td><span class="fw-bold text-danger">${e.dataDev}</span></td><td><button class="btn ${btnClass} btn-sm rounded-pill" onclick="window.enviarZap('${telAtualizado}','${e.alunoNome}','${e.livroTitulo}','${e.dataDev}','${e.id}')"><i class="fab fa-whatsapp"></i> ${btnText}</button></td></tr>`;
+                        atr += `<tr><td><span class="item-title">${e.alunoNome}</span><span class="item-subtitle">${e.alunoSala}</span></td><td><b>${e.livroTitulo}</b></td><td><span class="fw-bold text-danger">${e.dataDev}</span></td><td><button class="btn ${btnClass} btn-sm rounded-pill" onclick="window.enviarZap('${telAtualizado}','${e.alunoNome}','${e.livroTitulo}','e.dataDev','${e.id}')"><i class="fab fa-whatsapp"></i> ${telAtualizado?(jaCobradoHj?'COBRADO':'COBRAR'):'SEM NÚMERO'}</button></td></tr>`;
                     }
                 });
                 let h = ""; Object.keys(tMap).sort().forEach(t => h += `<div class="turma-card"><div class="turma-header"><i class="fas fa-graduation-cap"></i> TURMA: ${t}</div><table class="table table-elite"><tbody>${tMap[t]}</tbody></table></div>`);

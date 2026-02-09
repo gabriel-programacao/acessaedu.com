@@ -349,7 +349,7 @@
             <div class="card-premium">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h5 class="fw-bold m-0">Gestão Face ID</h5>
-                    <input type="text" id="buscaFace" class="form-control w-25 rounded-pill shadow-sm border-0 bg-light" placeholder="Pesquisar..." onkeyup="window.filtrarGestaoFace()">
+                    <input type="text" id="buscaFace" class="form-control w-25 rounded-pill shadow-sm border-0 bg-light" placeholder="Pesquisar aluno..." onkeyup="window.filtrarGestaoFace()">
                 </div>
                 <div class="accordion accordion-flush" id="accordionBiometria"></div>
             </div>
@@ -395,7 +395,7 @@
             <div class="card-premium">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h5 class="fw-bold m-0">Lista Geral de Estudantes</h5>
-                    <input type="text" id="buscaA" class="form-control w-25 rounded-pill shadow-sm border-0 bg-light" placeholder="Pesquisar..." onkeyup="window.filtrarAlunos()">
+                    <input type="text" id="buscaA" class="form-control w-25 rounded-pill shadow-sm border-0 bg-light" placeholder="Pesquisar aluno..." onkeyup="window.filtrarAlunos()">
                 </div>
                 <div class="accordion accordion-flush" id="accordionEstudantes"></div>
             </div>
@@ -793,6 +793,72 @@
             if(id === 'sec-stats') updateCharts();
         };
 
+        // --- ACRÉSCIMO: BUSCA INTELIGENTE COM EXPANSÃO DE ACCORDION ---
+        window.filtrarAlunos = () => {
+            const queryText = document.getElementById('buscaA').value.toLowerCase();
+            const accordions = document.querySelectorAll('#accordionEstudantes .accordion-item');
+
+            accordions.forEach(item => {
+                const rows = item.querySelectorAll('tbody tr');
+                const btn = item.querySelector('.accordion-button');
+                const collapse = item.querySelector('.accordion-collapse');
+                let hasMatch = false;
+
+                rows.forEach(row => {
+                    const nome = row.innerText.toLowerCase();
+                    if (nome.includes(queryText)) {
+                        row.style.display = '';
+                        hasMatch = true;
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+
+                const bsCollapse = bootstrap.Collapse.getOrCreateInstance(collapse, { toggle: false });
+                if (queryText.length > 0 && hasMatch) {
+                    item.style.display = '';
+                    bsCollapse.show(); // Abre se achou alguém
+                } else if (queryText.length > 0 && !hasMatch) {
+                    item.style.display = 'none'; // Esconde a turma se não tem ninguém
+                } else {
+                    item.style.display = ''; // Volta ao normal se busca vazia
+                    bsCollapse.hide();
+                }
+            });
+        };
+
+        window.filtrarGestaoFace = () => {
+            const queryText = document.getElementById('buscaFace').value.toLowerCase();
+            const accordions = document.querySelectorAll('#accordionBiometria .accordion-item');
+
+            accordions.forEach(item => {
+                const cards = item.querySelectorAll('.item-face');
+                const collapse = item.querySelector('.accordion-collapse');
+                let hasMatch = false;
+
+                cards.forEach(card => {
+                    const nome = card.getAttribute('data-nome');
+                    if (nome.includes(queryText)) {
+                        card.style.display = '';
+                        hasMatch = true;
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+
+                const bsCollapse = bootstrap.Collapse.getOrCreateInstance(collapse, { toggle: false });
+                if (queryText.length > 0 && hasMatch) {
+                    item.style.display = '';
+                    bsCollapse.show();
+                } else if (queryText.length > 0 && !hasMatch) {
+                    item.style.display = 'none';
+                } else {
+                    item.style.display = '';
+                    bsCollapse.hide();
+                }
+            });
+        };
+
         window.gerarRelatorio = async () => {
             const dataSel = document.getElementById('relData').value;
             if(!dataSel) return Swal.fire("Atenção", "Selecione uma data", "warning");
@@ -883,12 +949,11 @@
             bootstrap.Modal.getInstance(document.getElementById('modalConfirmarApagarTurma')).hide();
         };
 
-        // --- FUNÇÃO ABRIR MODAL ATUALIZADA (ACRÉSCIMO) ---
+        // --- FUNÇÃO ABRIR MODAL ATUALIZADA (VERIFICA TELEFONES) ---
         window.abrirCapturaModal = async (id, n) => { 
             idAlunoCapturaModal = id; 
             document.getElementById('nomeAlunoModal').innerText = n; 
             
-            // Limpa campos extras e esconde área
             document.getElementById('extra-tel-aluno').value = "";
             document.getElementById('extra-tel-resp').value = "";
             document.getElementById('campos-contato-extra').classList.add('d-none');
@@ -897,7 +962,6 @@
                 const docSnap = await getDoc(doc(db, "alunos", id));
                 if (docSnap.exists()) {
                     const dados = docSnap.data();
-                    // Se faltar algum dos dois telefones, mostra o campo para cadastro
                     if (!dados.telefone || !dados.tel) {
                         document.getElementById('campos-contato-extra').classList.remove('d-none');
                         document.getElementById('extra-tel-aluno').value = dados.telefone || "";
@@ -913,7 +977,6 @@
 
         window.fecharModalCaptura = () => { const v = document.getElementById('videoModal'); if(v.srcObject) v.srcObject.getTracks().forEach(t => t.stop()); bootstrap.Modal.getInstance(document.getElementById('modalCapturaRapida')).hide(); };
         
-        // --- FUNÇÃO SALVAR ATUALIZADA (ACRÉSCIMO) ---
         document.getElementById('btnEfetivarFaceModal').onclick = async () => { 
             const statusModal = document.getElementById('statusModal');
             statusModal.innerText = "Processando Face...";
@@ -921,14 +984,10 @@
             const det = await faceapi.detectSingleFace(document.getElementById('videoModal'), new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor(); 
             
             if(det) { 
-                const updateData = { 
-                    descritor: Array.from(det.descriptor) 
-                };
-
+                const updateData = { descritor: Array.from(det.descriptor) };
                 const extraTelAlu = document.getElementById('extra-tel-aluno').value.trim();
                 const extraTelResp = document.getElementById('extra-tel-resp').value.trim();
 
-                // Se os campos de contato estiverem visíveis, salva os números também
                 if (!document.getElementById('campos-contato-extra').classList.contains('d-none')) {
                     if (extraTelAlu) updateData.telefone = extraTelAlu;
                     if (extraTelResp) updateData.tel = extraTelResp;
