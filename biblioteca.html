@@ -133,10 +133,18 @@
         <div id="sec-atrasos" class="content-section">
             <div class="card-lux border-start border-danger border-5">
                 <div class="d-flex justify-content-between mb-4 align-items-center">
-                    <h5 class="fw-bold text-danger m-0">Pendências (Cobrança via WhatsApp)</h5>
-                    <input type="text" class="search-bar-elite" id="searchAtrasos" placeholder="Buscar pendente..." onkeyup="window.filterTable('listaAtrasadosTab', this.value)">
+                    <div>
+                        <h5 class="fw-bold text-danger m-0">Pendências de Devolução</h5>
+                        <p class="small text-muted mb-0" id="statusMassa"></p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <input type="text" class="search-bar-elite" id="searchAtrasos" placeholder="Buscar pendente..." onkeyup="window.filterTable('listaAtrasadosTab', this.value)">
+                        <button class="btn btn-success rounded-pill px-4 fw-bold shadow-sm" onclick="window.cobrarTodosAtrasados()">
+                            <i class="fas fa-paper-plane me-2"></i> COBRAR TODOS (Z-API)
+                        </button>
+                    </div>
                 </div>
-                <table class="table table-elite"><thead><tr><th>Estudante</th><th>Livro</th><th>Cobrar</th></tr></thead><tbody id="listaAtrasadosTab"></tbody></table>
+                <table class="table table-elite"><thead><tr><th>Estudante</th><th>Livro</th><th>Vencimento</th><th>Ação</th></tr></thead><tbody id="listaAtrasadosTab"></tbody></table>
             </div>
         </div>
     </main>
@@ -157,9 +165,9 @@
         const auth = getAuth(app);
         
         let logado = JSON.parse(localStorage.getItem('usuarioLogado'));
-        let cacheAlunos = [], cacheLivros = [];
+        let cacheAlunos = [], cacheLivros = [], configUnidade = null;
 
-        onAuthStateChanged(auth, user => { 
+        onAuthStateChanged(auth, async user => { 
             if(user && logado) { 
                 document.getElementById('unidadeTxt').innerText = "| " + logado.escolaId.toUpperCase();
                 const badge = document.getElementById('statusBadge');
@@ -174,6 +182,10 @@
                 } else {
                     btnVoltar.href = 'dashboard.html';
                 }
+
+                const uSnap = await getDoc(doc(db, "unidades", logado.escolaId));
+                if(uSnap.exists()) configUnidade = uSnap.data();
+
                 initApp(); 
             } else { window.location.href = "index.html"; } 
         });
@@ -222,7 +234,9 @@
             if(v.length < 2) { res.style.display = 'none'; return; }
             let h = "";
             cacheAlunos.filter(a => a.nome.toLowerCase().includes(v.toLowerCase())).forEach(a => {
-                h += `<div class="search-item" onclick="window.selectAlu('${a.id}','${a.nome}','${a.sala}', '${a.tel || ''}')"><span class="item-title">${a.nome}</span><span class="item-subtitle">${a.sala}</span></div>`;
+                // Pega tanto 'telefone' quanto 'tel' do cadastro para validar se tem número
+                const temNum = !!(a.telefone || a.tel);
+                h += `<div class="search-item" onclick="window.selectAlu('${a.id}','${a.nome}','${a.sala}', '${temNum ? (a.telefone || a.tel) : ''}')"><span class="item-title">${a.nome} ${!temNum ? '<i class="fas fa-exclamation-circle text-danger ms-2"></i>' : ''}</span><span class="item-subtitle">${a.sala}</span></div>`;
             });
             res.innerHTML = h; res.style.display = 'block';
         };
@@ -262,13 +276,11 @@
             Swal.fire("Obra Catalogada", "O livro foi adicionado ao acervo.", "success");
         };
 
-        // --- FUNÇÃO DE CONFIRMAÇÃO COM TRAVA DE BLOQUEIO ---
         document.getElementById('btnConfirmarEmp').onclick = async () => {
-            const aid = document.getElementById('sid-alu').value, lid = document.getElementById('sid-liv').value, dat = document.getElementById('inp-data').value;
+            const aid = document.getElementById('sid-alu').value, lid = document.getElementById('sid-liv').value, dat = document.getElementById('inp-data').value, tel = document.getElementById('inp-alu').dataset.tel;
             if(!aid || !lid || !dat) return Swal.fire("Campos incompletos", "", "warning");
 
             try {
-                // BUSCA EMPRÉSTIMOS ATIVOS DO ALUNO
                 const qAtivos = query(collection(db, "emprestimos"), 
                     where("alunoId", "==", aid), 
                     where("status", "==", "Ativo"),
@@ -276,50 +288,37 @@
                 );
                 const snapAtivos = await getDocs(qAtivos);
                 const totalEmprestimos = snapAtivos.size;
-                
-                // VERIFICA SE HÁ LIVROS ATRASADOS
                 const agora = Date.now();
                 let temAtraso = false;
-                snapAtivos.forEach(doc => {
-                    if (agora > doc.data().timestampDev) temAtraso = true;
-                });
+                snapAtivos.forEach(doc => { if (agora > doc.data().timestampDev) temAtraso = true; });
 
-                // REGRAS DE BLOQUEIO
-                if (temAtraso) {
-                    return Swal.fire({
-                        icon: 'error',
-                        title: 'Empréstimo Bloqueado',
-                        text: 'Este estudante possui livros em ATRASO. Ele deve devolver as pendências antes de realizar uma nova saída.',
-                        confirmButtonColor: '#d33'
-                    });
-                }
+                if (temAtraso) return Swal.fire({ icon: 'error', title: 'Empréstimo Bloqueado', text: 'Este estudante possui livros em ATRASO.', confirmButtonColor: '#d33' });
+                if (totalEmprestimos >= 3) return Swal.fire({ icon: 'error', title: 'Limite Atingido', text: 'Este estudante já possui 3 livros em mãos.', confirmButtonColor: '#d33' });
 
-                if (totalEmprestimos >= 3) {
-                    return Swal.fire({
-                        icon: 'error',
-                        title: 'Limite Atingido',
-                        text: 'Este estudante já possui 3 livros em mãos (limite máximo). Realize a baixa de algum exemplar para liberar uma nova saída.',
-                        confirmButtonColor: '#d33'
-                    });
-                }
-
-                // SE PASSAR NAS REGRAS, REGISTRA A SAÍDA
                 const infoAlu = document.getElementById('inp-alu').value.split(' | ');
                 const dataObj = new Date(dat + "T12:00:00");
+                
                 await addDoc(collection(db, "emprestimos"), {
-                    alunoId: aid, alunoNome: infoAlu[0], alunoSala: infoAlu[1], alunoTel: document.getElementById('inp-alu').dataset.tel || "",
+                    alunoId: aid, alunoNome: infoAlu[0], alunoSala: infoAlu[1], alunoTel: tel || "",
                     livroId: lid, livroTitulo: document.getElementById('inp-liv').value,
                     dataDev: dataObj.toLocaleDateString('pt-BR'), timestampDev: dataObj.getTime(),
-                    status: "Ativo", escolaId: logado.escolaId, createdAt: serverTimestamp()
+                    status: "Ativo", escolaId: logado.escolaId, createdAt: serverTimestamp(), ultimoEnvioZap: ""
                 });
                 await updateDoc(doc(db, "livros", lid), { quantidade: increment(-1) });
                 bootstrap.Modal.getInstance(document.getElementById('modalEmprestimo')).hide();
-                Swal.fire("Saída Registrada", "Empréstimo concluído com sucesso.", "success");
 
-            } catch (e) {
-                console.error(e);
-                Swal.fire("Erro no Processamento", "Não foi possível validar as regras de bloqueio.", "error");
-            }
+                // AVISO DE DADOS AUSENTES SE ESTIVER SEM TELEFONE
+                if(!tel) {
+                    Swal.fire({
+                        title: "Empréstimo Concluído!",
+                        html: `<div class="text-danger fw-bold">ALERTA DE CADASTRO:</div><br><b>${infoAlu[0]}</b>, favor procurar <b>Gabriel na secretaria</b> para atualizar seus dados de contato.`,
+                        icon: "warning",
+                        confirmButtonText: "ENTENDIDO"
+                    });
+                } else {
+                    Swal.fire("Saída Registrada", "Empréstimo concluído.", "success");
+                }
+            } catch (e) { console.error(e); }
         };
 
         window.abrirGestao = async (id) => {
@@ -336,41 +335,111 @@
             const dataObj = new Date(dVal + "T12:00:00");
             await updateDoc(doc(db, "emprestimos", id), { dataDev: dataObj.toLocaleDateString('pt-BR'), timestampDev: dataObj.getTime() });
             bootstrap.Modal.getInstance(document.getElementById('modalEditarEmprestimo')).hide();
-            Swal.fire("Prazo Atualizado", "A nova data foi salva.", "success");
+            Swal.fire("Prazo Atualizado", "", "success");
         };
 
         window.renovarRapido = async () => {
             try {
                 const id = document.getElementById('edit-emp-id').value;
-                if(!id) return;
                 const snap = await getDoc(doc(db, "emprestimos", id));
-                if(!snap.exists()) return;
-                const dataAtualBanco = new Date(snap.data().timestampDev);
-                dataAtualBanco.setDate(dataAtualBanco.getDate() + 7);
-                await updateDoc(doc(db, "emprestimos", id), { 
-                    dataDev: dataAtualBanco.toLocaleDateString('pt-BR'), 
-                    timestampDev: dataAtualBanco.getTime() 
-                });
+                const nD = new Date(snap.data().timestampDev); nD.setDate(nD.getDate() + 7);
+                await updateDoc(doc(db, "emprestimos", id), { dataDev: nD.toLocaleDateString('pt-BR'), timestampDev: nD.getTime() });
                 bootstrap.Modal.getInstance(document.getElementById('modalEditarEmprestimo')).hide();
-                Swal.fire("Prazo Renovado", "O aluno ganhou +7 dias de permanência.", "success");
-            } catch (e) {
-                Swal.fire("Erro na Renovação", "Tente novamente mais tarde.", "error");
-            }
+                Swal.fire("Prazo Renovado", "+7 dias ganhos.", "success");
+            } catch (e) { }
         };
 
         window.darBaixa = async (eid, lid) => {
-            const res = await Swal.fire({ title: 'Confirmar Devolução?', text: 'O exemplar retornará ao estoque físico.', icon: 'question', showCancelButton: true, confirmButtonText: 'Sim, dar baixa' });
+            const res = await Swal.fire({ title: 'Dar Baixa?', icon: 'question', showCancelButton: true });
             if(res.isConfirmed) {
                 await updateDoc(doc(db, "emprestimos", eid), { status: 'Devolvido' });
                 await updateDoc(doc(db, "livros", lid), { quantidade: increment(1) });
-                Swal.fire("Baixa Concluída", "", "success");
+                Swal.fire("Concluído", "", "success");
             }
         };
 
-        window.enviarZap = (tel, n, l) => {
-            if(!tel) return Swal.fire("Dados Ausentes", "Este aluno não possui telefone de contato.", "warning");
-            const msg = window.encodeURIComponent(`Olá ${n}, lembramos da devolução do livro "${l}". Por favor, entregue na biblioteca assim que possível. ✅`);
-            window.open(`https://api.whatsapp.com/send?phone=55${tel.replace(/\D/g,'')}&text=${msg}`, '_blank');
+        window.enviarZap = async (tel, n, l, dataDev, eid = null) => {
+            if(!tel) return Swal.fire({
+                title: "Cadastro Incompleto",
+                text: `${n} deve procurar Gabriel na secretaria para atualizar o telefone de contato.`,
+                icon: "error"
+            });
+
+            const msg = `*AcessaEdu | Biblioteca* 📚\n\n` +
+                         `Olá, *${n.split(' ')[0]}*! Tudo bem?\n\n` +
+                         `Passando para lembrar que o livro *"${l}"* estava com a data de devolução prevista para o dia *${dataDev}*.\n\n` +
+                         `Caso precise de mais tempo para concluir a leitura, por favor, procure *Giselda na parte da tarde* para realizar a renovação do seu exemplar. ✅\n\n` +
+                         `Se já realizou a devolução hoje, favor desconsiderar esta mensagem. ✨`;
+            
+            if(configUnidade && configUnidade.mensagensAtivas && eid) {
+                const sucesso = await window.processarZapi(tel, msg);
+                if(sucesso) {
+                    await updateDoc(doc(db, "emprestimos", eid), { ultimoEnvioZap: new Date().toLocaleDateString('pt-BR') });
+                    return true;
+                }
+                return false;
+            } else {
+                window.open(`https://api.whatsapp.com/send?phone=55${tel.replace(/\D/g,'')}&text=${window.encodeURIComponent(msg)}`, '_blank');
+                if(eid) await updateDoc(doc(db, "emprestimos", eid), { ultimoEnvioZap: new Date().toLocaleDateString('pt-BR') });
+                return true;
+            }
+        };
+
+        window.processarZapi = async (tel, msg) => {
+            try {
+                const endpoint = `${configUnidade.zapiApi.trim().split('/instances')[0]}/instances/${configUnidade.zapiInstance}/token/${configUnidade.zapiToken}/send-text`;
+                let num = tel.replace(/\D/g, '');
+                if (num.length === 11) num = num.substring(0, 2) + num.substring(3);
+                const headers = { 'Content-Type': 'application/json' };
+                if (configUnidade.zapiSecurity) headers['Client-Token'] = configUnidade.zapiSecurity;
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({ phone: "55" + num, message: msg, delayMessage: 10, delayTyping: 5 })
+                });
+                return response.ok;
+            } catch (e) { return false; }
+        };
+
+        window.cobrarTodosAtrasados = async () => {
+            const hoje = new Date().toLocaleDateString('pt-BR');
+            const statusTxt = document.getElementById('statusMassa');
+            const q = query(collection(db, "emprestimos"), where("escolaId", "==", logado.escolaId), where("status", "==", "Ativo"));
+            const snap = await getDocs(q);
+            const agora = Date.now();
+            let enviados = 0;
+
+            const listaParaCobrar = [];
+            snap.forEach(d => {
+                const e = d.data();
+                // Considera apenas quem tem telefone para o disparo em massa automático
+                if(agora > e.timestampDev && e.ultimoEnvioZap !== hoje && e.alunoTel) {
+                    listaParaCobrar.push({id: d.id, ...e});
+                }
+            });
+
+            if(listaParaCobrar.length === 0) return Swal.fire("Tudo em dia!", "Nenhuma pendência nova para cobrar automaticamente hoje.", "info");
+
+            const confirm = await Swal.fire({
+                title: 'Iniciar Cobrança?',
+                text: `Serão enviadas ${listaParaCobrar.length} mensagens. Alunos sem número serão ignorados no disparo automático.`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Sim, disparar'
+            });
+
+            if(!confirm.isConfirmed) return;
+
+            statusTxt.innerText = "Preparando disparos...";
+            for (const e of listaParaCobrar) {
+                statusTxt.innerText = `[${enviados+1}/${listaParaCobrar.length}] Enviando para: ${e.alunoNome}...`;
+                const ok = await window.enviarZap(e.alunoTel, e.alunoNome, e.livroTitulo, e.dataDev, e.id);
+                if(ok) enviados++;
+                await new Promise(r => setTimeout(r, 2000)); 
+            }
+            statusTxt.innerText = `Concluído! ${enviados} mensagens enviadas.`;
+            Swal.fire("Finalizado", `${enviados} mensagens enviadas com sucesso.`, "success");
         };
 
         function initApp() {
@@ -385,27 +454,35 @@
                     tb += `<tr><td><span class="item-title">${b.titulo}</span><span class="item-subtitle">${b.autor}</span></td><td class="text-center"><span class="badge ${b.quantidade > 0 ? 'bg-light text-primary' : 'bg-danger-subtle text-danger'} rounded-pill px-3 py-2 fw-bold">${b.quantidade} UN</span></td><td class="text-end"><button class="btn btn-sm btn-light text-danger rounded-circle" onclick="deleteDoc(doc(db,'livros','${d.id}'))"><i class="fas fa-trash"></i></button></td></tr>`;
                 });
                 document.getElementById('listaLivrosAcervo').innerHTML = tb; document.getElementById('st-total').innerText = tot;
-                window.filterTable('listaLivrosAcervo', document.getElementById('searchAcervo').value);
             });
 
             onSnapshot(query(collection(db, "emprestimos"), where("escolaId", "==", logado.escolaId), where("status", "==", "Ativo")), snap => {
-                let rec = "", atr = "", ca = 0, cat = 0, ag = Date.now(), tMap = {};
+                let rec = "", atr = "", ca = 0, cat = 0, ag = Date.now(), tMap = {}, hoje = new Date().toLocaleDateString('pt-BR');
                 snap.forEach(d => {
                     const e = {id: d.id, ...d.data()}; const isA = ag > e.timestampDev; ca++; if(isA) cat++;
                     const alunoAtual = cacheAlunos.find(a => a.id === e.alunoId);
-                    const telAtualizado = alunoAtual ? (alunoAtual.tel || alunoAtual.telefone || e.alunoTel) : e.alunoTel;
+                    
+                    // Prioriza o telefone do cadastro mais recente
+                    const telAtualizado = alunoAtual ? (alunoAtual.telefone || alunoAtual.tel || e.alunoTel) : e.alunoTel;
+                    
                     const dias = Math.ceil((e.timestampDev - ag) / 86400000);
+                    const jaCobradoHj = e.ultimoEnvioZap === hoje;
+
                     const row = `<tr><td><span class="item-title">${e.alunoNome}</span></td><td><b>${e.livroTitulo}</b></td><td>${e.dataDev} ${isA?'<span class="badge bg-danger">ATRASADO</span>':`<span class="badge bg-light text-dark">${dias} dias</span>`}</td><td><div class="d-flex gap-2"><button class="btn btn-sm btn-success rounded-pill px-3" onclick="window.darBaixa('${e.id}','${e.livroId}')">Baixa</button><button class="btn btn-sm btn-light rounded-pill px-3" onclick="window.abrirGestao('${e.id}')">Gerenciar</button></div></td></tr>`;
                     rec += `<tr><td><span class="item-title">${e.alunoNome}</span><span class="item-subtitle">${e.alunoSala}</span></td><td><b>${e.livroTitulo}</b></td><td>${e.dataDev}</td></tr>`;
                     if(!tMap[e.alunoSala]) tMap[e.alunoSala] = ""; tMap[e.alunoSala] += row;
-                    if(isA) atr += `<tr><td><span class="item-title">${e.alunoNome}</span><span class="item-subtitle">${e.alunoSala}</span></td><td><b>${e.livroTitulo}</b></td><td><button class="btn btn-success btn-sm rounded-pill" onclick="window.enviarZap('${telAtualizado}','${e.alunoNome}','${e.livroTitulo}')"><i class="fab fa-whatsapp"></i></button></td></tr>`;
+                    
+                    if(isA) {
+                        const btnClass = telAtualizado ? (jaCobradoHj ? 'btn-light' : 'btn-success') : 'btn-danger';
+                        const btnText = telAtualizado ? (jaCobradoHj ? 'COBRADO' : 'COBRAR') : 'SEM NÚMERO';
+                        
+                        atr += `<tr><td><span class="item-title">${e.alunoNome}</span><span class="item-subtitle">${e.alunoSala}</span></td><td><b>${e.livroTitulo}</b></td><td><span class="fw-bold text-danger">${e.dataDev}</span></td><td><button class="btn ${btnClass} btn-sm rounded-pill" onclick="window.enviarZap('${telAtualizado}','${e.alunoNome}','${e.livroTitulo}','${e.dataDev}','${e.id}')"><i class="fab fa-whatsapp"></i> ${btnText}</button></td></tr>`;
+                    }
                 });
                 let h = ""; Object.keys(tMap).sort().forEach(t => h += `<div class="turma-card"><div class="turma-header"><i class="fas fa-graduation-cap"></i> TURMA: ${t}</div><table class="table table-elite"><tbody>${tMap[t]}</tbody></table></div>`);
-                document.getElementById('container-por-turma').innerHTML = h || '<div class="text-center p-5 opacity-50">Nenhuma saída ativa no momento.</div>';
-                document.getElementById('listaRecentes').innerHTML = rec; document.getElementById('listaAtrasadosTab').innerHTML = atr || '<tr><td colspan="3" class="text-center p-4">Excelente! Nenhuma pendência hoje.</td></tr>';
+                document.getElementById('container-por-turma').innerHTML = h || '<div class="text-center p-5 opacity-50">Nenhuma saída ativa.</div>';
+                document.getElementById('listaRecentes').innerHTML = rec; document.getElementById('listaAtrasadosTab').innerHTML = atr || '<tr><td colspan="4" class="text-center p-4">Excelente! Nenhuma pendência hoje.</td></tr>';
                 document.getElementById('st-ativos').innerText = ca; document.getElementById('st-atrasos').innerText = cat;
-                window.filterAlunosAtivos(document.getElementById('searchTurmas').value);
-                window.filterTable('listaAtrasadosTab', document.getElementById('searchAtrasos').value);
             });
         }
     </script>
