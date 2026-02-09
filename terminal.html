@@ -197,11 +197,9 @@
                 return;
             }
 
-            // LIMPEZA DA URL: Pega apenas o domínio base para não duplicar rotas
             let cleanBase = apiBase.trim().split('/instances')[0].replace(/\/+$/, "");
             const endpoint = `${cleanBase}/instances/${instanceId}/token/${token}/send-text`;
 
-            // LIMPEZA DO NÚMERO
             let num = telefone.replace(/\D/g, '');
             if (num.length === 11) num = num.substring(0, 2) + num.substring(3);
             const cleanPhone = "55" + num;
@@ -219,7 +217,12 @@
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: meusHeaders,
-                    body: JSON.stringify({ phone: cleanPhone, message: mensagem })
+                    body: JSON.stringify({ 
+                        phone: cleanPhone, 
+                        message: mensagem,
+                        delayMessage: 10, // Acrescentado: Espera 10 segundos antes de enviar
+                        delayTyping: 5    // Acrescentado: Mostra "digitando" por 5 segundos
+                    })
                 });
 
                 const statusEl = document.getElementById('msg-status');
