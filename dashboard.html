@@ -493,7 +493,31 @@
 
     <div class="modal fade" id="modalCapturaRapida" data-bs-backdrop="static" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 rounded-5 shadow-lg"><div class="modal-header bg-primary text-white p-4 border-0"><h5 class="fw-bold m-0" id="nomeAlunoModal">Biometria</h5><button type="button" class="btn-close btn-close-white" onclick="window.fecharModalCaptura()"></button></div><div class="modal-body p-4 text-center"><video id="videoModal" style="width: 100%; border-radius: 20px; background: #000; transform: scaleX(-1);" autoplay muted playsinline></video><div id="statusModal" class="small fw-bold mt-3 text-muted">Aguardando...</div><button class="btn btn-success w-100 py-3 mt-4 rounded-4 fw-bold" id="btnEfetivarFaceModal">SALVAR AGORA</button></div></div>
+            <div class="modal-content border-0 rounded-5 shadow-lg">
+                <div class="modal-header bg-primary text-white p-4 border-0">
+                    <h5 class="fw-bold m-0" id="nomeAlunoModal">Biometria</h5>
+                    <button type="button" class="btn-close btn-close-white" onclick="window.fecharModalCaptura()"></button>
+                </div>
+                <div class="modal-body p-4 text-center">
+                    <video id="videoModal" style="width: 100%; border-radius: 20px; background: #000; transform: scaleX(-1);" autoplay muted playsinline></video>
+                    <div id="statusModal" class="small fw-bold mt-3 text-muted">Aguardando IA...</div>
+
+                    <div id="campos-contato-extra" class="mt-4 text-start d-none">
+                        <hr>
+                        <p class="small fw-bold text-primary mb-2"><i class="fas fa-exclamation-triangle me-1 text-warning"></i> Contatos não encontrados. Complete para ativar notificações:</p>
+                        <div class="mb-2">
+                            <label class="small fw-bold opacity-50">WHATSAPP ALUNO</label>
+                            <input type="text" id="extra-tel-aluno" class="form-control border-0 bg-light rounded-3" placeholder="Ex: 819...">
+                        </div>
+                        <div class="mb-2">
+                            <label class="small fw-bold opacity-50">WHATSAPP RESPONSÁVEL</label>
+                            <input type="text" id="extra-tel-resp" class="form-control border-0 bg-light rounded-3" placeholder="Ex: 819...">
+                        </div>
+                    </div>
+
+                    <button class="btn btn-success w-100 py-3 mt-4 rounded-4 fw-bold" id="btnEfetivarFaceModal">SALVAR AGORA</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -859,9 +883,65 @@
             bootstrap.Modal.getInstance(document.getElementById('modalConfirmarApagarTurma')).hide();
         };
 
-        window.abrirCapturaModal = async (id, n) => { idAlunoCapturaModal = id; document.getElementById('nomeAlunoModal').innerText = n; new bootstrap.Modal(document.getElementById('modalCapturaRapida')).show(); const s = await navigator.mediaDevices.getUserMedia({ video: true }); document.getElementById('videoModal').srcObject = s; };
+        // --- FUNÇÃO ABRIR MODAL ATUALIZADA (ACRÉSCIMO) ---
+        window.abrirCapturaModal = async (id, n) => { 
+            idAlunoCapturaModal = id; 
+            document.getElementById('nomeAlunoModal').innerText = n; 
+            
+            // Limpa campos extras e esconde área
+            document.getElementById('extra-tel-aluno').value = "";
+            document.getElementById('extra-tel-resp').value = "";
+            document.getElementById('campos-contato-extra').classList.add('d-none');
+
+            try {
+                const docSnap = await getDoc(doc(db, "alunos", id));
+                if (docSnap.exists()) {
+                    const dados = docSnap.data();
+                    // Se faltar algum dos dois telefones, mostra o campo para cadastro
+                    if (!dados.telefone || !dados.tel) {
+                        document.getElementById('campos-contato-extra').classList.remove('d-none');
+                        document.getElementById('extra-tel-aluno').value = dados.telefone || "";
+                        document.getElementById('extra-tel-resp').value = dados.tel || "";
+                    }
+                }
+            } catch (e) { console.error(e); }
+
+            new bootstrap.Modal(document.getElementById('modalCapturaRapida')).show(); 
+            const s = await navigator.mediaDevices.getUserMedia({ video: true }); 
+            document.getElementById('videoModal').srcObject = s; 
+        };
+
         window.fecharModalCaptura = () => { const v = document.getElementById('videoModal'); if(v.srcObject) v.srcObject.getTracks().forEach(t => t.stop()); bootstrap.Modal.getInstance(document.getElementById('modalCapturaRapida')).hide(); };
-        document.getElementById('btnEfetivarFaceModal').onclick = async () => { const det = await faceapi.detectSingleFace(document.getElementById('videoModal'), new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor(); if(det) { await updateDoc(doc(db, "alunos", idAlunoCapturaModal), { descritor: Array.from(det.descriptor) }); window.fecharModalCaptura(); } };
+        
+        // --- FUNÇÃO SALVAR ATUALIZADA (ACRÉSCIMO) ---
+        document.getElementById('btnEfetivarFaceModal').onclick = async () => { 
+            const statusModal = document.getElementById('statusModal');
+            statusModal.innerText = "Processando Face...";
+            
+            const det = await faceapi.detectSingleFace(document.getElementById('videoModal'), new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor(); 
+            
+            if(det) { 
+                const updateData = { 
+                    descritor: Array.from(det.descriptor) 
+                };
+
+                const extraTelAlu = document.getElementById('extra-tel-aluno').value.trim();
+                const extraTelResp = document.getElementById('extra-tel-resp').value.trim();
+
+                // Se os campos de contato estiverem visíveis, salva os números também
+                if (!document.getElementById('campos-contato-extra').classList.contains('d-none')) {
+                    if (extraTelAlu) updateData.telefone = extraTelAlu;
+                    if (extraTelResp) updateData.tel = extraTelResp;
+                }
+
+                await updateDoc(doc(db, "alunos", idAlunoCapturaModal), updateData); 
+                window.fecharModalCaptura();
+                Swal.fire("Sucesso", "Biometria e contatos atualizados!", "success");
+            } else {
+                statusModal.innerText = "Rosto não detectado!";
+                statusModal.classList.add('text-danger');
+            }
+        };
         
         window.abrirEdicao = (id, n, s, t, telAlu) => { document.getElementById('editId').value = id; document.getElementById('editNome').value = n; document.getElementById('editSala').value = s; document.getElementById('editTel').value = t; document.getElementById('editTelAluno').value = telAlu; new bootstrap.Modal(document.getElementById('modalEditAluno')).show(); };
         window.confirmarEdicao = async () => { await updateDoc(doc(db, "alunos", document.getElementById('editId').value), { nome: document.getElementById('editNome').value, sala: document.getElementById('editSala').value, tel: document.getElementById('editTel').value, telefone: document.getElementById('editTelAluno').value }); bootstrap.Modal.getInstance(document.getElementById('modalEditAluno')).hide(); };
