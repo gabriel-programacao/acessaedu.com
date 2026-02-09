@@ -470,7 +470,52 @@
             </div>
         </div>
 
+        <div id="sec-atrasos" class="secao">
+            <div class="card-premium">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h5 class="fw-bold m-0 text-primary"><i class="fas fa-clock me-2"></i>Atrasos Recorrentes (Trimestre)</h5>
+                        <small class="text-muted">Corte: 07:46 | Apenas a 1ª entrada do dia é considerada</small>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-primary rounded-pill px-4 fw-bold" onclick="window.abrirModalRegistroManual()">
+                            <i class="fas fa-plus me-2"></i>REGISTRAR MANUAL
+                        </button>
+                        <button class="btn btn-danger rounded-pill px-4 fw-bold" onclick="window.dispararNotificacoesMassaAtraso()">
+                            <i class="fas fa-paper-plane me-2"></i>NOTIFICAR FILA
+                        </button>
+                    </div>
+                </div>
+                <div id="accordionAtrasos" class="accordion accordion-flush"></div>
+            </div>
+        </div>
+
     </main>
+
+    <div class="modal fade" id="modalJustificarAtraso" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content p-4 rounded-5 border-0 shadow-lg">
+                <h5 class="fw-bold mb-3">Justificar Atraso</h5>
+                <input type="hidden" id="just-aluno-id">
+                <input type="hidden" id="just-aluno-nome">
+                <div class="mb-3">
+                    <label class="small fw-bold">DATA PARA ABONAR</label>
+                    <select id="just-data-select" class="form-select border-0 bg-light rounded-4"></select>
+                </div>
+                <div class="mb-4">
+                    <label class="small fw-bold">MOTIVO DA JUSTIFICATIVA</label>
+                    <select id="just-motivo" class="form-select border-0 bg-light rounded-4">
+                        <option value="Atestado Médico">Atestado Médico</option>
+                        <option value="Declaração dos Pais">Declaração dos Pais</option>
+                        <option value="Problemas de Saúde">Problemas de Saúde</option>
+                        <option value="Transporte">Problemas de Transporte</option>
+                        <option value="Outros">Outros</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary w-100 py-3 rounded-4 fw-bold" onclick="window.salvarJustificativa()">CONFIRMAR JUSTIFICATIVA</button>
+            </div>
+        </div>
+    </div>
 
     <div class="modal fade modal-confirm-delete" id="modalConfirmarApagarTurma" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
@@ -535,9 +580,51 @@
         </div>
     </div>
 
+    <div class="modal fade" id="modalRegistroManualAtraso" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content p-4 rounded-5 border-0 shadow-lg">
+                <h5 class="fw-bold mb-3 text-primary">Registrar Atraso Manual</h5>
+                <div class="mb-3">
+                    <label class="small fw-bold">SELECIONE O ALUNO</label>
+                    <select id="reg-manual-aluno" class="form-select border-0 bg-light rounded-4"></select>
+                </div>
+                <div class="mb-3">
+                    <label class="small fw-bold">DATA DO ATRASO</label>
+                    <input type="date" id="reg-manual-data" class="form-control border-0 bg-light rounded-4">
+                </div>
+                <div class="mb-4">
+                    <label class="small fw-bold">HORÁRIO (Opcional - Padrão 07:50)</label>
+                    <input type="time" id="reg-manual-hora" class="form-control border-0 bg-light rounded-4" value="07:50">
+                </div>
+                <button class="btn btn-success w-100 py-3 rounded-4 fw-bold" onclick="window.salvarAtrasoManual()">SALVAR REGISTRO</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalAgendarReuniao" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content p-4 rounded-5 border-0 shadow-lg">
+                <h5 class="fw-bold mb-4 text-primary">Agendar Reunião</h5>
+                <p class="small text-muted">Este aluno completou 6 atrasos. Informe os dados para a convocação:</p>
+                <input type="hidden" id="reuniao-aluno-id">
+                <input type="hidden" id="reuniao-aluno-nome">
+                <input type="hidden" id="reuniao-aluno-tel">
+                <div class="mb-3">
+                    <label class="small fw-bold mb-2">DATA DA REUNIÃO</label>
+                    <input type="date" id="reuniao-data" class="form-control rounded-4 border-light bg-light">
+                </div>
+                <div class="mb-4">
+                    <label class="small fw-bold mb-2">HORÁRIO</label>
+                    <input type="time" id="reuniao-hora" class="form-control rounded-4 border-light bg-light">
+                </div>
+                <button class="btn btn-success w-100 py-3 rounded-4 fw-bold" onclick="window.confirmarDisparoReuniao()">ENVIAR CONVOCAÇÃO</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, updateDoc, onSnapshot, query, where, getDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, updateDoc, onSnapshot, query, where, getDoc, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
         const firebaseConfig = { apiKey: "AIzaSyDgR98RtL8sgxVbEV2Swyb2wnHLSPt3cDo", authDomain: "escolapro-15e5e.firebaseapp.com", projectId: "escolapro-15e5e", storageBucket: "escolapro-15e5e.firebasestorage.app", messagingSenderId: "339019791514", appId: "1:339019791514:web:44e0d58b6835f0fe6df323" };
@@ -545,6 +632,7 @@
         let logado = JSON.parse(localStorage.getItem('usuarioLogado'));
         let chartB = null, chartP = null, idAlunoCapturaModal = "";
         let turmaParaApagarGlobal = "";
+        let configUnidadeGlobal = null;
 
         window.toggleMenu = () => { document.getElementById('sidebar').classList.toggle('show'); document.getElementById('overlay').classList.toggle('show'); };
         onAuthStateChanged(auth, (user) => { if (!user || !logado) window.location.href = 'index.html'; else initDashboard(); });
@@ -558,6 +646,7 @@
             onSnapshot(doc(db, "unidades", logado.escolaId), (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
+                    configUnidadeGlobal = data;
                     if (data.status === 'Bloqueado') {
                         Swal.fire({ icon: 'error', title: 'Acesso Suspenso', text: 'Esta unidade foi bloqueada pelo administrador.', confirmButtonColor: '#003399' }).then(() => window.logout());
                     }
@@ -616,7 +705,7 @@
                     s.innerHTML = opt; e.innerHTML = opt; r.innerHTML = `<option value="TODAS">Todas as Turmas</option>` + opt;
                 }
             } catch (e) {}
-            initIA(); escutarDados(); escutarBroadcast();
+            initIA(); escutarDados(); escutarBroadcast(); escutarAtrasosRecorrentes();
         }
 
         window.alertaCotaAtingida = () => {
@@ -683,7 +772,6 @@
             } catch (e) { return { autorizado: false }; }
         }
 
-        // --- ATUALIZAÇÃO: IMPORTAR 4 COLUNAS ---
         window.importarExcel = async (input) => {
             const status = document.getElementById('statusImportacao'); 
             const file = input.files[0]; 
@@ -712,8 +800,8 @@
                             sala: turma.toString().trim(), 
                             escolaId: logado.escolaId, 
                             descritor: null, 
-                            telefone: telAlu ? telAlu.toString().replace(/\D/g, '') : "", // Celular do Aluno
-                            tel: telResp ? telResp.toString().replace(/\D/g, '') : ""         // Celular do Responsável
+                            telefone: telAlu ? telAlu.toString().replace(/\D/g, '') : "",
+                            tel: telResp ? telResp.toString().replace(/\D/g, '') : ""
                         });
                         importados++;
                     }
@@ -724,7 +812,6 @@
             reader.readAsArrayBuffer(file);
         };
 
-        // --- ATUALIZAÇÃO: LIMPAR TODA BASE ---
         window.limparTodaBaseAlunos = async () => {
             const { value: password } = await Swal.fire({
                 title: '⚠️ APAGAR TUDO?',
@@ -765,6 +852,7 @@
                 {id:'sec-gestao-face', label:'Biometria', icon:'fa-fingerprint'},
                 {id:'sec-relatorios', label:'Relatórios', icon:'fa-file-invoice'},
                 {id:'sec-faltas', label:'Estudantes', icon:'fa-users'},
+                {id:'sec-atrasos', label:'Atrasos Recorrentes', icon:'fa-clock'},
                 {id:'sec-gestao', label:'Minha Assinatura', icon:'fa-gem text-warning'}
             ];
             if(libLiberada) itens.push({id:'link-bib', label:'Biblioteca', icon:'fa-book text-warning', isLink: true, url: 'biblioteca.html'});
@@ -793,14 +881,12 @@
             if(id === 'sec-stats') updateCharts();
         };
 
-        // --- ACRÉSCIMO: BUSCA INTELIGENTE COM EXPANSÃO DE ACCORDION ---
         window.filtrarAlunos = () => {
             const queryText = document.getElementById('buscaA').value.toLowerCase();
             const accordions = document.querySelectorAll('#accordionEstudantes .accordion-item');
 
             accordions.forEach(item => {
                 const rows = item.querySelectorAll('tbody tr');
-                const btn = item.querySelector('.accordion-button');
                 const collapse = item.querySelector('.accordion-collapse');
                 let hasMatch = false;
 
@@ -817,11 +903,11 @@
                 const bsCollapse = bootstrap.Collapse.getOrCreateInstance(collapse, { toggle: false });
                 if (queryText.length > 0 && hasMatch) {
                     item.style.display = '';
-                    bsCollapse.show(); // Abre se achou alguém
+                    bsCollapse.show(); 
                 } else if (queryText.length > 0 && !hasMatch) {
-                    item.style.display = 'none'; // Esconde a turma se não tem ninguém
+                    item.style.display = 'none'; 
                 } else {
-                    item.style.display = ''; // Volta ao normal se busca vazia
+                    item.style.display = ''; 
                     bsCollapse.hide();
                 }
             });
@@ -901,7 +987,7 @@
             const v = document.getElementById('webcam');
             if(!n) return Swal.fire("Erro", "Nome obrigatório", "error");
             const cota = await verificarCotaDisponivel(); 
-            if(!cota.autorizado) return window.alertaCotaAtingida();
+            if(!cota.autorized) return window.alertaCotaAtingida();
             const det = await faceapi.detectSingleFace(v, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
             if(!det) return Swal.fire("Atenção", "Rosto não detectado", "warning");
             await addDoc(collection(db, "alunos"), { nome: n, sala: s, escolaId: logado.escolaId, descritor: Array.from(det.descriptor), tel: document.getElementById('tAluno').value, telefone: document.getElementById('telAluno').value });
@@ -915,7 +1001,7 @@
             const n = document.getElementById('nAluno').value.trim();
             if(!n) return Swal.fire("Erro", "Nome obrigatório", "error");
             const cota = await verificarCotaDisponivel(); 
-            if(!cota.autorizado) return window.alertaCotaAtingida();
+            if(!cota.autorized) return window.alertaCotaAtingida();
             await addDoc(collection(db, "alunos"), { nome: document.getElementById('nAluno').value, sala: document.getElementById('sAluno').value, escolaId: logado.escolaId, descritor: null, tel: document.getElementById('tAluno').value, telefone: document.getElementById('telAluno').value }); 
             Swal.fire("Sucesso!", "Aluno cadastrado com sucesso.", "success");
         };
@@ -924,7 +1010,21 @@
             onSnapshot(query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId)), snap => {
                 const accordionE = document.getElementById('accordionEstudantes'), accordionB = document.getElementById('accordionBiometria');
                 accordionE.innerHTML = ""; accordionB.innerHTML = "";
-                let turmas = {}; snap.forEach(d => { let a = d.data(); if(!turmas[a.sala]) turmas[a.sala] = []; turmas[a.sala].push({id: d.id, ...a}); });
+                let turmas = {}; 
+                let listAlunosReg = [];
+                snap.forEach(d => { 
+                    let a = d.data(); 
+                    if(!turmas[a.sala]) turmas[a.sala] = []; 
+                    turmas[a.sala].push({id: d.id, ...a}); 
+                    listAlunosReg.push({id: d.id, nome: a.nome, sala: a.sala});
+                });
+
+                const selManual = document.getElementById('reg-manual-aluno');
+                if(selManual) {
+                    listAlunosReg.sort((a,b)=>a.nome.localeCompare(b.nome));
+                    selManual.innerHTML = listAlunosReg.map(al => `<option value='${JSON.stringify(al)}'>${al.nome} (${al.sala})</option>`).join('');
+                }
+
                 Object.keys(turmas).sort().forEach(t => {
                     const idT = t.replace(/\s+/g, '-');
                     let linesE = "", cardsB = "";
@@ -949,15 +1049,10 @@
             bootstrap.Modal.getInstance(document.getElementById('modalConfirmarApagarTurma')).hide();
         };
 
-        // --- FUNÇÃO ABRIR MODAL ATUALIZADA (VERIFICA TELEFONES) ---
         window.abrirCapturaModal = async (id, n) => { 
-            idAlunoCapturaModal = id; 
-            document.getElementById('nomeAlunoModal').innerText = n; 
-            
-            document.getElementById('extra-tel-aluno').value = "";
-            document.getElementById('extra-tel-resp').value = "";
+            idAlunoCapturaModal = id; document.getElementById('nomeAlunoModal').innerText = n; 
+            document.getElementById('extra-tel-aluno').value = ""; document.getElementById('extra-tel-resp').value = "";
             document.getElementById('campos-contato-extra').classList.add('d-none');
-
             try {
                 const docSnap = await getDoc(doc(db, "alunos", id));
                 if (docSnap.exists()) {
@@ -969,37 +1064,26 @@
                     }
                 }
             } catch (e) { console.error(e); }
-
             new bootstrap.Modal(document.getElementById('modalCapturaRapida')).show(); 
-            const s = await navigator.mediaDevices.getUserMedia({ video: true }); 
-            document.getElementById('videoModal').srcObject = s; 
+            const s = await navigator.mediaDevices.getUserMedia({ video: true }); document.getElementById('videoModal').srcObject = s; 
         };
 
         window.fecharModalCaptura = () => { const v = document.getElementById('videoModal'); if(v.srcObject) v.srcObject.getTracks().forEach(t => t.stop()); bootstrap.Modal.getInstance(document.getElementById('modalCapturaRapida')).hide(); };
         
         document.getElementById('btnEfetivarFaceModal').onclick = async () => { 
-            const statusModal = document.getElementById('statusModal');
-            statusModal.innerText = "Processando Face...";
-            
+            const statusModal = document.getElementById('statusModal'); statusModal.innerText = "Processando Face...";
             const det = await faceapi.detectSingleFace(document.getElementById('videoModal'), new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor(); 
-            
             if(det) { 
                 const updateData = { descritor: Array.from(det.descriptor) };
                 const extraTelAlu = document.getElementById('extra-tel-aluno').value.trim();
                 const extraTelResp = document.getElementById('extra-tel-resp').value.trim();
-
                 if (!document.getElementById('campos-contato-extra').classList.contains('d-none')) {
                     if (extraTelAlu) updateData.telefone = extraTelAlu;
                     if (extraTelResp) updateData.tel = extraTelResp;
                 }
-
                 await updateDoc(doc(db, "alunos", idAlunoCapturaModal), updateData); 
-                window.fecharModalCaptura();
-                Swal.fire("Sucesso", "Biometria e contatos atualizados!", "success");
-            } else {
-                statusModal.innerText = "Rosto não detectado!";
-                statusModal.classList.add('text-danger');
-            }
+                window.fecharModalCaptura(); Swal.fire("Sucesso", "Biometria e contatos atualizados!", "success");
+            } else { statusModal.innerText = "Rosto não detectado!"; statusModal.classList.add('text-danger'); }
         };
         
         window.abrirEdicao = (id, n, s, t, telAlu) => { document.getElementById('editId').value = id; document.getElementById('editNome').value = n; document.getElementById('editSala').value = s; document.getElementById('editTel').value = t; document.getElementById('editTelAluno').value = telAlu; new bootstrap.Modal(document.getElementById('modalEditAluno')).show(); };
@@ -1014,6 +1098,270 @@
             if(chartP) chartP.destroy(); chartP = new Chart(document.getElementById('chartPizza'), { type: 'doughnut', data: { labels: ['Presentes', 'Faltas'], datasets: [{ data: [p, f], backgroundColor: ['#10b981', '#ef4444'] }] }, options: { cutout: '75%', plugins: { legend: { display: false } } } });
             if(chartB) chartB.destroy(); chartB = new Chart(document.getElementById('chartBarras'), { type: 'bar', data: { labels: ['Total', 'Presentes'], datasets: [{ data: [t, p], backgroundColor: ['#003399', '#10b981'] }] }, options: { plugins: { legend: { display: false } } } });
         }
+
+        // --- LÓGICA DE ATRASOS RECORRENTES CORRIGIDA ---
+
+        async function escutarAtrasosRecorrentes() {
+            onSnapshot(query(collection(db, "frequencia"), where("escolaId", "==", logado.escolaId)), async snapFreq => {
+                const alunosSnap = await getDocs(query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId)));
+                const mapaAlunos = {};
+                alunosSnap.forEach(d => {
+                    const data = d.data();
+                    mapaAlunos[data.nome] = { id: d.id, ...data };
+                });
+
+                const atrasosPorAluno = {};
+                const entradasJaProcessadas = new Set(); 
+
+                const docsOrdenados = snapFreq.docs.map(d => d.data()).sort((a,b) => a.hora.localeCompare(b.hora));
+
+                docsOrdenados.forEach(f => {
+                    const chaveUnicaDia = `${f.nome}_${f.data}`;
+                    if (entradasJaProcessadas.has(chaveUnicaDia)) return; 
+                    
+                    entradasJaProcessadas.add(chaveUnicaDia);
+
+                    const [hora, min] = f.hora.split(':').map(Number);
+                    const totalMinutos = (hora * 60) + min;
+                    
+                    if (totalMinutos >= 466) { // 07:46
+                        const al = mapaAlunos[f.nome];
+                        const justificativas = al?.justificativas || [];
+                        
+                        if (!justificativas.includes(f.data)) {
+                            if (!atrasosPorAluno[f.nome]) atrasosPorAluno[f.nome] = [];
+                            atrasosPorAluno[f.nome].push(f.data);
+                        }
+                    }
+                });
+
+                const accordion = document.getElementById('accordionAtrasos');
+                accordion.innerHTML = "";
+                const turmas = {};
+
+                for (let nome in atrasosPorAluno) {
+                    const listaDatas = atrasosPorAluno[nome];
+                    const qtd = listaDatas.length;
+                    if (qtd < 3) continue;
+
+                    const al = mapaAlunos[nome];
+                    if (!al) continue;
+
+                    if (!turmas[al.sala]) turmas[al.sala] = "";
+                    
+                    const corBadge = qtd >= 9 ? 'bg-danger' : (qtd >= 6 ? 'bg-warning text-dark' : 'bg-primary');
+                    const labelStatus = qtd >= 9 ? 'CONSELHO TUTELAR' : (qtd >= 6 ? 'CONVOCAR RESPONSÁVEL' : 'NOTIFICAR ADVERTÊNCIA');
+                    
+                    let infoNotificacao = "";
+                    if (al.ultimoEnvioAtraso && al.qtdAtrasoNotificada == (qtd >= 9 ? 9 : (qtd >= 6 ? 6 : 3))) {
+                        infoNotificacao = `<br><span class="badge bg-light text-dark border mt-1">Mensagem enviada em: ${al.ultimoEnvioAtraso}</span>`;
+                    }
+
+                    turmas[al.sala] += `
+                        <div class="user-item p-3 mb-2 rounded-4 border bg-white d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-bold text-uppercase small">${nome}</span>
+                                <span class="badge ${corBadge} ms-2">${qtd} ATRASOS</span>
+                                ${infoNotificacao}
+                                <br><small class="text-muted">Status: <b>${labelStatus}</b></small>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="window.abrirModalJustificar('${al.id}', '${nome}', '${listaDatas.join('|')}')">JUSTIFICAR</button>
+                                <button class="btn btn-sm btn-primary-modern" onclick="window.prepararNotificacaoAtraso('${al.id}', '${nome}', '${al.tel}', ${qtd}, '${listaDatas.join(', ')}')">
+                                    <i class="fas fa-paper-plane me-1"></i> NOTIFICAR
+                                </button>
+                            </div>
+                        </div>`;
+                }
+
+                for (let sala in turmas) {
+                    const idS = sala.replace(/\s+/g, '-');
+                    accordion.innerHTML += `
+                        <div class="accordion-item border-0 mb-2 shadow-sm rounded-4 overflow-hidden">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed fw-bold text-primary py-3 px-4 bg-white" type="button" data-bs-toggle="collapse" data-bs-target="#accA-${idS}">
+                                    TURMA: ${sala}
+                                </button>
+                            </h2>
+                            <div id="accA-${idS}" class="accordion-collapse collapse">
+                                <div class="accordion-body bg-light p-3">${turmas[sala]}</div>
+                            </div>
+                        </div>`;
+                }
+            });
+        }
+
+        window.abrirModalRegistroManual = () => {
+            document.getElementById('reg-manual-data').valueAsDate = new Date();
+            new bootstrap.Modal(document.getElementById('modalRegistroManualAtraso')).show();
+        };
+
+        window.salvarAtrasoManual = async () => {
+            const rawVal = document.getElementById('reg-manual-aluno').value;
+            if(!rawVal) return;
+            const alData = JSON.parse(rawVal);
+            const dataSel = document.getElementById('reg-manual-data').value;
+            const horaSel = document.getElementById('reg-manual-hora').value;
+
+            if(!dataSel || !horaSel) return Swal.fire("Atenção", "Preencha todos os campos", "warning");
+
+            const dataFormatada = new Date(dataSel + 'T00:00:00').toLocaleDateString('pt-BR');
+
+            try {
+                await addDoc(collection(db, "frequencia"), {
+                    escolaId: logado.escolaId,
+                    nome: alData.nome,
+                    sala: alData.sala,
+                    data: dataFormatada,
+                    hora: horaSel,
+                    timestamp: serverTimestamp(),
+                    tipo: "Manual"
+                });
+                bootstrap.Modal.getInstance(document.getElementById('modalRegistroManualAtraso')).hide();
+                Swal.fire("Sucesso", "Atraso registrado. A lista será atualizada.", "success");
+            } catch (e) { Swal.fire("Erro", "Falha ao registrar.", "error"); }
+        };
+
+        window.abrirModalJustificar = (id, nome, datasStr) => {
+            document.getElementById('just-aluno-id').value = id;
+            document.getElementById('just-aluno-nome').value = nome;
+            const select = document.getElementById('just-data-select');
+            select.innerHTML = datasStr.split('|').map(d => `<option value="${d}">${d}</option>`).join('');
+            new bootstrap.Modal(document.getElementById('modalJustificarAtraso')).show();
+        };
+
+        window.salvarJustificativa = async () => {
+            const id = document.getElementById('just-aluno-id').value;
+            const data = document.getElementById('just-data-select').value;
+            const motivo = document.getElementById('just-motivo').value;
+
+            try {
+                const docRef = doc(db, "alunos", id);
+                const snap = await getDoc(docRef);
+                const atuais = snap.data().justificativas || [];
+                atuais.push(data);
+                
+                await updateDoc(docRef, { justificativas: atuais });
+                bootstrap.Modal.getInstance(document.getElementById('modalJustificarAtraso')).hide();
+                Swal.fire("Justificado", `O atraso do dia ${data} foi abonado.`, "success");
+            } catch (e) { Swal.fire("Erro", "Falha ao salvar.", "error"); }
+        };
+
+        window.prepararNotificacaoAtraso = async (id, nome, tel, qtd, datas) => {
+            if (!tel) return Swal.fire("Erro", "Aluno sem WhatsApp do responsável.", "error");
+            
+            const snap = await getDoc(doc(db, "alunos", id));
+            const aluno = snap.data();
+            const hoje = new Date().toLocaleDateString('pt-BR');
+
+            let patamar = (qtd >= 9) ? 9 : (qtd >= 6 ? 6 : 3);
+
+            if (aluno.qtdAtrasoNotificada == patamar && aluno.ultimoEnvioAtraso == hoje) {
+                return Swal.fire("Atenção", "Notificação para este nível já enviada hoje.", "info");
+            }
+            
+            if (patamar == 6) {
+                document.getElementById('reuniao-aluno-id').value = id;
+                document.getElementById('reuniao-aluno-nome').value = nome;
+                document.getElementById('reuniao-aluno-tel').value = tel;
+                new bootstrap.Modal(document.getElementById('modalAgendarReuniao')).show();
+                return;
+            }
+
+            window.enviarMensagemAtraso(id, nome, tel, patamar, datas);
+        };
+
+        window.confirmarDisparoReuniao = () => {
+            const id = document.getElementById('reuniao-aluno-id').value;
+            const nome = document.getElementById('reuniao-aluno-nome').value;
+            const tel = document.getElementById('reuniao-aluno-tel').value;
+            const d = document.getElementById('reuniao-data').value;
+            const h = document.getElementById('reuniao-hora').value;
+
+            if (!d || !h) return Swal.fire("Atenção", "Informe data e hora.", "warning");
+
+            const dataFormat = new Date(d + 'T00:00:00').toLocaleDateString('pt-BR');
+            window.enviarMensagemAtraso(id, nome, tel, 6, "", dataFormat, h);
+            bootstrap.Modal.getInstance(document.getElementById('modalAgendarReuniao')).hide();
+        };
+
+        window.enviarMensagemAtraso = async (id, nome, tel, qtd, datas = "", dataR = "", horaR = "") => {
+            const hoje = new Date().toLocaleDateString('pt-BR');
+            let mensagem = "";
+            
+            if (qtd == 3) {
+                mensagem = `*AcessaEdu | Notificação de Atraso* ⚠️\n\nOlá! Informamos que o(a) aluno(a) *${nome.toUpperCase()}* chegou após às 07:45 na escola nos dias: ${datas}.\n\nAtrasos recorrentes prejudicam o estudante. Se chegar a 6 atrasos, os responsáveis serão convocados. ✨`;
+            } else if (qtd == 6) {
+                mensagem = `*AcessaEdu | Convocação de Responsáveis* 🚨\n\nOlá! Informamos que o(a) aluno(a) *${nome.toUpperCase()}* atingiu 6 atrasos.\n\nÉ necessária a presença dos responsáveis na escola no dia *${dataR}* às *${horaR}* para reunião. ✨`;
+            } else if (qtd == 9) {
+                mensagem = `*AcessaEdu | Alerta Crítico* 🛑\n\nOlá! Informamos que o(a) aluno(a) *${nome.toUpperCase()}* atingiu 9 atrasos.\n\nEncaminharemos o prontuário ao *Conselho Tutelar* para providências. ✨`;
+            }
+
+            if (await window.processarZapiAtraso(tel, mensagem)) {
+                await updateDoc(doc(db, "alunos", id), { ultimoEnvioAtraso: hoje, qtdAtrasoNotificada: qtd });
+                Swal.fire("Sucesso", "WhatsApp enviado!", "success");
+            }
+        };
+
+        window.processarZapiAtraso = async (tel, msg) => {
+            if (!configUnidadeGlobal || !configUnidadeGlobal.zapiApi) return false;
+            try {
+                const endpoint = `${configUnidadeGlobal.zapiApi.trim().split('/instances')[0]}/instances/${configUnidadeGlobal.zapiInstance}/token/${configUnidadeGlobal.zapiToken}/send-text`;
+                let num = tel.replace(/\D/g, '');
+                if (num.length === 11) num = num.substring(0, 2) + num.substring(3);
+                const headers = { 'Content-Type': 'application/json' };
+                if (configUnidadeGlobal.zapiSecurity) headers['Client-Token'] = configUnidadeGlobal.zapiSecurity;
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({ phone: "55" + num, message: msg, delayMessage: 1, delayTyping: 1 })
+                });
+                return response.ok;
+            } catch (e) { return false; }
+        };
+
+        window.dispararNotificacoesMassaAtraso = async () => {
+            const confirm = await Swal.fire({
+                title: 'Disparo em Massa',
+                text: "Notificar quem atingiu 3 ou 9 atrasos hoje pela primeira vez?",
+                icon: 'warning',
+                showCancelButton: true
+            });
+
+            if (confirm.isConfirmed) {
+                Swal.fire({title: 'Processando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+                
+                const alunosSnap = await getDocs(query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId)));
+                const freqSnap = await getDocs(query(collection(db, "frequencia"), where("escolaId", "==", logado.escolaId)));
+                const hoje = new Date().toLocaleDateString('pt-BR');
+                
+                const mapaFreq = {};
+                freqSnap.forEach(d => {
+                    const f = d.data();
+                    const [h, m] = f.hora.split(':').map(Number);
+                    if((h*60+m) >= 466) {
+                        if(!mapaFreq[f.nome]) mapaFreq[f.nome] = new Set();
+                        mapaFreq[f.nome].add(f.data);
+                    }
+                });
+
+                let totalEnviados = 0;
+                for(let docAlu of alunosSnap.docs) {
+                    const al = docAlu.data();
+                    const atrasosValidos = Array.from(mapaFreq[al.nome] || []).filter(d => !(al.justificativas || []).includes(d));
+                    const qtd = atrasosValidos.length;
+                    const patamar = (qtd >= 9) ? 9 : (qtd >= 6 ? 6 : (qtd >= 3 ? 3 : 0));
+
+                    if(patamar > 0 && patamar != 6 && al.qtdAtrasoNotificada != patamar && al.tel) {
+                        await window.enviarMensagemAtraso(docAlu.id, al.nome, al.tel, patamar, atrasosValidos.join(', '));
+                        totalEnviados++;
+                    }
+                }
+                Swal.fire("Finalizado", `${totalEnviados} notificações enviadas.`, "success");
+            }
+        };
+
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
