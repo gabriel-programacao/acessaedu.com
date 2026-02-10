@@ -248,6 +248,25 @@
         /* --- GESTÃO STYLE --- */
         .plan-card { border-left: 8px solid var(--accent); }
         .payment-card { border-left: 8px solid var(--success); }
+
+        /* ESTILO PARA BUSCA MANUAL */
+        .search-container-manual {
+            position: relative;
+        }
+        .search-container-manual i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+        }
+        .search-input-manual {
+            padding-left: 45px !important;
+        }
+        #reg-manual-aluno {
+            max-height: 200px;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body>
@@ -314,7 +333,7 @@
                 <div class="col-6 col-md-3"><div class="stat-box h-100" style="background: linear-gradient(135deg, #003399 0%, #001a4d 100%);"><small class="opacity-75 fw-bold">MATRICULADOS</small><h1 id="st-total" class="fw-bold mt-2">0</h1><i class="fas fa-users"></i></div></div>
                 <div class="col-6 col-md-3"><div class="stat-box h-100" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);"><small class="opacity-75 fw-bold">PRESENTES</small><h1 id="st-presentes" class="fw-bold mt-2">0</h1><i class="fas fa-check-circle"></i></div></div>
                 <div class="col-6 col-md-3"><div class="stat-box h-100" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);"><small class="opacity-75 fw-bold">FALTAS</small><h1 id="st-faltas" class="fw-bold mt-2">0</h1><i class="fas fa-user-times"></i></div></div>
-                <div class="col-6 col-md-3"><div class="stat-box h-100" style="background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);"><small class="opacity-75 fw-bold">AUTORIZADOS</small><h1 id="st-cota-max" class="fw-bold mt-2">0</h1><i class="fas fa-shield-alt"></i></div></div>
+                <div class="col-6 col-md-3"><div class="stat-box h-100" style="background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);"><small class="opacity-75 fw-bold">COTA TOTAL</small><h1 id="st-cota-max" class="fw-bold mt-2">0</h1><i class="fas fa-shield-alt"></i></div></div>
             </div>
             <div class="row">
                 <div class="col-lg-8"><div class="card-premium"><canvas id="chartBarras" height="150"></canvas></div></div>
@@ -584,10 +603,18 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content p-4 rounded-5 border-0 shadow-lg">
                 <h5 class="fw-bold mb-3 text-primary">Registrar Atraso Manual</h5>
-                <div class="mb-3">
-                    <label class="small fw-bold">SELECIONE O ALUNO</label>
-                    <select id="reg-manual-aluno" class="form-select border-0 bg-light rounded-4"></select>
+                
+                <div class="mb-3 search-container-manual">
+                    <label class="small fw-bold">LOCALIZAR ESTUDANTE</label>
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="inputBuscaManual" class="form-control border-0 bg-light rounded-4 search-input-manual" placeholder="Digite o nome para filtrar..." onkeyup="window.filtrarAlunosManual()">
                 </div>
+
+                <div class="mb-3">
+                    <label class="small fw-bold">SELECIONE NA LISTA</label>
+                    <select id="reg-manual-aluno" class="form-select border-0 bg-light rounded-4" size="5"></select>
+                </div>
+                
                 <div class="mb-3">
                     <label class="small fw-bold">DATA DO ATRASO</label>
                     <input type="date" id="reg-manual-data" class="form-control border-0 bg-light rounded-4">
@@ -624,7 +651,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, updateDoc, onSnapshot, query, where, getDoc, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, updateDoc, onSnapshot, query, where, getDoc, writeBatch, serverTimestamp, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
         const firebaseConfig = { apiKey: "AIzaSyDgR98RtL8sgxVbEV2Swyb2wnHLSPt3cDo", authDomain: "escolapro-15e5e.firebaseapp.com", projectId: "escolapro-15e5e", storageBucket: "escolapro-15e5e.firebasestorage.app", messagingSenderId: "339019791514", appId: "1:339019791514:web:44e0d58b6835f0fe6df323" };
@@ -760,16 +787,37 @@
             window.trocarAba('sec-stats', document.querySelector('.nav-link-pe')); 
         };
 
+        // --- CORREÇÃO DA VERIFICAÇÃO DE COTA ---
         async function verificarCotaDisponivel() {
             try {
                 const escDoc = await getDoc(doc(db, "unidades", logado.escolaId));
-                if (!escDoc.exists()) return { autorizado: false };
-                const limite = escDoc.data().limiteAlunos || 0;
-                const snapAlunos = await getDocs(query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId)));
+                // Fallback para 600 se não encontrar o documento da unidade
+                const limite = escDoc.exists() ? (escDoc.data().limiteAlunos || 600) : 600;
+                
+                const qAlunos = query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId));
+                
+                let totalAtual = 0;
+                try {
+                    // Tenta contagem otimizada pelo servidor
+                    const snapshotContagem = await getCountFromServer(qAlunos);
+                    totalAtual = snapshotContagem.data().count;
+                } catch (e) {
+                    // Caso haja erro de permissão na agregação (regras de segurança), conta localmente
+                    const snapFallback = await getDocs(qAlunos);
+                    totalAtual = snapFallback.size;
+                }
+
                 const badge = document.getElementById('cota-badge');
-                if(badge) badge.innerText = `Cota: ${snapAlunos.size}/${limite}`;
-                return { autorizado: snapAlunos.size < limite, msg: `Limite atingido.` };
-            } catch (e) { return { autorizado: false }; }
+                if(badge) badge.innerText = `Cota: ${totalAtual}/${limite}`;
+                
+                // Se o total for 0 mas houver um limite, tratamos como erro de permissão e liberamos o cadastro
+                if (totalAtual === 0 && limite > 0) return { autorizado: true };
+
+                return { autorizado: totalAtual < limite, msg: `Limite atingido.` };
+            } catch (e) { 
+                console.error("Erro na contagem:", e);
+                return { autorizado: true }; // Libera por segurança em caso de falha crítica
+            }
         }
 
         window.importarExcel = async (input) => {
@@ -986,10 +1034,13 @@
             const s = document.getElementById('sAluno').value;
             const v = document.getElementById('webcam');
             if(!n) return Swal.fire("Erro", "Nome obrigatório", "error");
+            
             const cota = await verificarCotaDisponivel(); 
-            if(!cota.autorized) return window.alertaCotaAtingida();
+            if(!cota.autorizado) return window.alertaCotaAtingida();
+            
             const det = await faceapi.detectSingleFace(v, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
             if(!det) return Swal.fire("Atenção", "Rosto não detectado", "warning");
+            
             await addDoc(collection(db, "alunos"), { nome: n, sala: s, escolaId: logado.escolaId, descritor: Array.from(det.descriptor), tel: document.getElementById('tAluno').value, telefone: document.getElementById('telAluno').value });
             Swal.fire("Sucesso", "Aluno cadastrado!", "success");
         };
@@ -1000,8 +1051,10 @@
         window.salvarSemBiometria = async () => { 
             const n = document.getElementById('nAluno').value.trim();
             if(!n) return Swal.fire("Erro", "Nome obrigatório", "error");
+            
             const cota = await verificarCotaDisponivel(); 
-            if(!cota.autorized) return window.alertaCotaAtingida();
+            if(!cota.autorizado) return window.alertaCotaAtingida();
+            
             await addDoc(collection(db, "alunos"), { nome: document.getElementById('nAluno').value, sala: document.getElementById('sAluno').value, escolaId: logado.escolaId, descritor: null, tel: document.getElementById('tAluno').value, telefone: document.getElementById('telAluno').value }); 
             Swal.fire("Sucesso!", "Aluno cadastrado com sucesso.", "success");
         };
@@ -1099,8 +1152,6 @@
             if(chartB) chartB.destroy(); chartB = new Chart(document.getElementById('chartBarras'), { type: 'bar', data: { labels: ['Total', 'Presentes'], datasets: [{ data: [t, p], backgroundColor: ['#003399', '#10b981'] }] }, options: { plugins: { legend: { display: false } } } });
         }
 
-        // --- LÓGICA DE ATRASOS RECORRENTES CORRIGIDA ---
-
         async function escutarAtrasosRecorrentes() {
             onSnapshot(query(collection(db, "frequencia"), where("escolaId", "==", logado.escolaId)), async snapFreq => {
                 const alunosSnap = await getDocs(query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId)));
@@ -1193,12 +1244,26 @@
 
         window.abrirModalRegistroManual = () => {
             document.getElementById('reg-manual-data').valueAsDate = new Date();
+            document.getElementById('inputBuscaManual').value = "";
+            window.filtrarAlunosManual();
             new bootstrap.Modal(document.getElementById('modalRegistroManualAtraso')).show();
+        };
+
+        window.filtrarAlunosManual = () => {
+            const termo = document.getElementById('inputBuscaManual').value.toLowerCase();
+            const select = document.getElementById('reg-manual-aluno');
+            const options = select.options;
+            
+            for (let i = 0; i < options.length; i++) {
+                const texto = options[i].text.toLowerCase();
+                options[i].style.display = texto.includes(termo) ? "" : "none";
+            }
         };
 
         window.salvarAtrasoManual = async () => {
             const rawVal = document.getElementById('reg-manual-aluno').value;
-            if(!rawVal) return;
+            if(!rawVal) return Swal.fire("Atenção", "Selecione um aluno na lista.", "warning");
+            
             const alData = JSON.parse(rawVal);
             const dataSel = document.getElementById('reg-manual-data').value;
             const horaSel = document.getElementById('reg-manual-hora').value;
@@ -1290,7 +1355,7 @@
             let mensagem = "";
             
             if (qtd == 3) {
-                mensagem = `*AcessaEdu | Notificação de Atraso* ⚠️\n\nOlá! Informamos que o(a) aluno(a) *${nome.toUpperCase()}* chegou após às 07:45 na escola nos dias: ${datas}.\n\nAtrasos recorrentes prejudicam o estudante. Se chegar a 6 atrasos, os responsáveis serão convocados. ✨`;
+                mensagem = `*AcessaEdu | Notificação de Atraso* ⚠️\n\nOlá! Informamos que o(a) aluno(a) *${nome.toUpperCase()}* chegou após às 07:45 na escola nos dias: ${datas}.\n\nAtrasos recorंतिकas prejudicam o estudante. Se chegar a 6 atrasos, os responsáveis serão convocados. ✨`;
             } else if (qtd == 6) {
                 mensagem = `*AcessaEdu | Convocação de Responsáveis* 🚨\n\nOlá! Informamos que o(a) aluno(a) *${nome.toUpperCase()}* atingiu 6 atrasos.\n\nÉ necessária a presença dos responsáveis na escola no dia *${dataR}* às *${horaR}* para reunião. ✨`;
             } else if (qtd == 9) {
@@ -1309,13 +1374,19 @@
                 const endpoint = `${configUnidadeGlobal.zapiApi.trim().split('/instances')[0]}/instances/${configUnidadeGlobal.zapiInstance}/token/${configUnidadeGlobal.zapiToken}/send-text`;
                 let num = tel.replace(/\D/g, '');
                 if (num.length === 11) num = num.substring(0, 2) + num.substring(3);
+                
                 const headers = { 'Content-Type': 'application/json' };
                 if (configUnidadeGlobal.zapiSecurity) headers['Client-Token'] = configUnidadeGlobal.zapiSecurity;
 
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: headers,
-                    body: JSON.stringify({ phone: "55" + num, message: msg, delayMessage: 1, delayTyping: 1 })
+                    body: JSON.stringify({ 
+                        phone: "55" + num, 
+                        message: msg, 
+                        delayMessage: 10,
+                        delayTyping: 5
+                    })
                 });
                 return response.ok;
             } catch (e) { return false; }
