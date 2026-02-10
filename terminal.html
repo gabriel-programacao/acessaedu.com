@@ -204,11 +204,48 @@
             if (num.length === 11) num = num.substring(0, 2) + num.substring(3);
             const cleanPhone = "55" + num;
 
-            const mensagem = `*AcessaEdu | Notificação Escolar* 🏫\n\n` +
-                             `Olá! Informamos que o(a) aluno(a) *${alunoNome.toUpperCase()}* registrou a entrada na instituição *${escolaNome}*.\n\n` +
+            // --- ACRESCIMO: LÓGICA DE HUMANIZAÇÃO E VARIABILIDADE (ANTI-BAN) ---
+            const saudacoes = ["Olá!", "Bom dia!", "Tudo bem?", "Aviso importante:", "AcessaEdu informa:", "Notificação escolar:", "Comunicado:", "Olá, tudo certo?", "Atenção:", "Oi!"];
+            const confirmacoes = [
+                `registrou a entrada na instituição *${escolaNome}*`,
+                `já se encontra na escola *${escolaNome}*`,
+                `acaba de chegar para as aulas na *${escolaNome}*`,
+                `confirmou presença agora pouco na *${escolaNome}*`,
+                `acessou o ambiente escolar (*${escolaNome}*)`,
+                `deu entrada na unidade *${escolaNome}*`,
+                `já está presente na instituição *${escolaNome}*`,
+                `passou pelo terminal de acesso da *${escolaNome}*`
+            ];
+            const interacoes = [
+                "Poderia nos confirmar com um *'OK'* se recebeu esta mensagem?",
+                "Está ciente desta entrada? Responda *'SIM'* para confirmarmos.",
+                "Tudo certo com o horário? Se puder, nos responda com um *'RECEBIDO'*.",
+                "Por favor, responda com um *'SIM'* para validar este canal de avisos.",
+                "Conseguiu ler esta confirmação? Responda com *'OK'* por gentileza.",
+                "Pode nos dar um breve retorno confirmando que recebeu?",
+                "Sua interação é importante: responda *'SIM'* para sabermos que você leu."
+            ];
+            const rodapes = [
+                "📌 *Dica:* Salve nosso contato para garantir que as notificações não caiam no spam.",
+                "💡 *Importante:* Adicione este número à sua agenda para visualizar nossos comunicados.",
+                "✅ *Segurança:* Salve este contato em seu celular para uma melhor comunicação.",
+                "🚪 *Sair:* Caso não queira mais receber estes avisos, responda *'PARAR'*.",
+                "📱 *Agenda:* Para não perder nenhum aviso, salve nosso número em seus contatos.",
+                "📵 *Privacidade:* Se deseja interromper estes envios, basta responder *'SAIR'*.",
+                "🤝 *Parceria:* Escola e família conectadas. Salve nosso número!"
+            ];
+
+            const s = saudacoes[Math.floor(Math.random() * saudacoes.length)];
+            const c = confirmacoes[Math.floor(Math.random() * confirmacoes.length)];
+            const i = interacoes[Math.floor(Math.random() * interacoes.length)];
+            const r = rodapes[Math.floor(Math.random() * rodapes.length)];
+
+            const mensagem = `*${escolaNome}* 🏫\n\n` +
+                             `${s} Informamos que o(a) aluno(a) *${alunoNome.toUpperCase()}* ${c}.\n\n` +
                              `📅 *Data:* ${new Date().toLocaleDateString('pt-BR')}\n` +
                              `⏰ *Horário:* ${hora}\n\n` +
-                             `Tenha um ótimo dia! ✨`;
+                             `${i}\n\n` +
+                             `${r}`;
 
             try {
                 const meusHeaders = { 'Content-Type': 'application/json' };
@@ -220,8 +257,8 @@
                     body: JSON.stringify({ 
                         phone: cleanPhone, 
                         message: mensagem,
-                        delayMessage: 10, // Acrescentado: Espera 10 segundos antes de enviar
-                        delayTyping: 5    // Acrescentado: Mostra "digitando" por 5 segundos
+                        delayMessage: 10, 
+                        delayTyping: 5    
                     })
                 });
 
