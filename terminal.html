@@ -12,19 +12,25 @@
     <style>
         :root { --pe-blue: #003399; --pe-yellow: #ffcc00; --pe-green: #10b981; --pe-red: #cc0000; }
         body { background: linear-gradient(135deg, var(--pe-blue) 0%, #001a4d 100%); color: white; font-family: 'Poppins', sans-serif; height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 0; }
-        .terminal-container { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(15px); border-radius: 40px; padding: 40px; border: 1px solid rgba(255, 255, 255, 0.2); width: 90%; max-width: 650px; text-align: center; box-shadow: 0 25px 50px rgba(0,0,0,0.3); }
-        .logo-terminal { background: rgba(255, 255, 255, 0.15); padding: 15px; border-radius: 20px; margin-bottom: 25px; }
-        video { width: 100%; border-radius: 25px; border: 5px solid white; transform: scaleX(-1); box-shadow: 0 15px 35px rgba(0,0,0,0.4); background: #000; }
-        .feedback-area { margin-top: 30px; min-height: 140px; transition: 0.5s; position: relative; }
-        .card-aluno { background: var(--pe-green); color: white; padding: 20px; border-radius: 25px; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
-        .card-bloqueio { background: var(--pe-red); color: white; padding: 20px; border-radius: 25px; animation: shake 0.5s ease-in-out; box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
-        .fila-badge { position: absolute; bottom: -20px; right: 0; font-size: 0.7rem; opacity: 0.8; background: rgba(0,0,0,0.3); padding: 2px 10px; border-radius: 10px; }
-        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
-        .btn-voltar { position: fixed; top: 20px; left: 20px; background: rgba(255,255,255,0.2); color: white; border-radius: 30px; padding: 8px 20px; text-decoration: none; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.3); transition: 0.3s; z-index: 100; }
-        .btn-voltar:hover { background: white; color: var(--pe-blue); }
+        
+        .terminal-container { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(15px); border-radius: 40px; padding: 40px; border: 1px solid rgba(255, 255, 255, 0.2); width: 95%; max-width: 700px; text-align: center; box-shadow: 0 25px 50px rgba(0,0,0,0.3); position: relative; }
+        
+        .video-wrapper { position: relative; width: 100%; border-radius: 25px; overflow: hidden; border: 5px solid white; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
+        video { width: 100%; transform: scaleX(-1); background: #000; display: block; }
+
+        .face-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 10; }
+        .face-cutout { width: 250px; height: 320px; border: 4px dashed rgba(255, 255, 255, 0.5); border-radius: 120px; box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.5); position: relative; transition: 0.3s; }
+        .face-cutout.detected { border-color: var(--pe-green); border-style: solid; box-shadow: 0 0 0 1000px rgba(16, 185, 129, 0.2); }
+        
+        .scan-line { position: absolute; width: 100%; height: 4px; background: rgba(255, 255, 255, 0.5); top: 0; animation: scanning 3s linear infinite; }
+        @keyframes scanning { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
+
+        .feedback-area { margin-top: 20px; min-height: 120px; }
+        .card-aluno { background: var(--pe-green); color: white; padding: 15px; border-radius: 20px; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .card-bloqueio { background: var(--pe-red); color: white; padding: 15px; border-radius: 20px; animation: shake 0.5s ease-in-out; }
+        
+        .btn-voltar { position: fixed; top: 20px; left: 20px; background: rgba(255,255,255,0.2); color: white; border-radius: 30px; padding: 8px 20px; text-decoration: none; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.3); z-index: 100; }
         @keyframes popIn { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; scale(1); } }
-        .loader { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid white; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; display: inline-block; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -32,12 +38,18 @@
     <a href="dashboard.html" class="btn-voltar"><i class="fas fa-arrow-left me-2"></i> Voltar</a>
 
     <div class="terminal-container">
-        <div class="logo-terminal"><img src="logo_acessaedu.png" alt="AcessaEdu" class="img-fluid" style="max-height: 70px;"></div>
-        <video id="video" autoplay muted playsinline></video>
+        <div class="logo-terminal mb-3"><img src="logo_acessaedu.png" alt="AcessaEdu" style="max-height: 60px;"></div>
+        
+        <div class="video-wrapper">
+            <video id="video" autoplay muted playsinline></video>
+            <div class="face-overlay">
+                <div class="face-cutout" id="moldura"><div class="scan-line"></div></div>
+            </div>
+        </div>
+
         <div class="feedback-area" id="display">
-            <div id="loading"><div class="loader mb-2"></div><p class="small">Iniciando Terminal Inteligente...</p></div>
-            <p class="fs-4 fw-bold mt-3" style="opacity: 0.8;">Aguardando identificação...</p>
-            <div id="status-fila" class="fila-badge"></div>
+            <p class="fs-5 fw-bold mt-3" id="instrucao">Aguardando enquadramento...</p>
+            <div id="status-fila" style="font-size: 0.7rem; opacity: 0.7;"></div>
         </div>
     </div>
 
@@ -64,8 +76,6 @@
         let tempoUltimaDeteccao = 0;
         let isProcessing = false;
         let configEscola = null;
-
-        // FILA DE PROCESSAMENTO SEQUENCIAL
         let filaDeEnvio = Promise.resolve();
 
         onAuthStateChanged(auth, (user) => {
@@ -81,7 +91,7 @@
                 if(snap.exists()) {
                     configEscola = snap.data();
                     initTerminal();
-                    processarFilaEsquecida(); // Recupera pendentes após atualizar página ou queda de net
+                    processarFilaEsquecida();
                 }
             } catch (e) { console.error(e); }
         }
@@ -108,165 +118,161 @@
                     }
                 });
 
-                if(labledDescriptors.length === 0) {
-                    document.getElementById('display').innerHTML = "<p class='text-warning'>Nenhum rosto cadastrado nesta unidade.</p>";
-                    return;
-                }
-
-                // --- ACRESCIMO: REGUA DE PRECISÃO EM 80% ---
-                const faceMatcher = new faceapi.FaceMatcher(labledDescriptors, 0.80);
-                document.getElementById('loading').style.display = 'none';
+                const faceMatcher = new faceapi.FaceMatcher(labledDescriptors, 0.60); 
                 
                 setInterval(async () => {
                     if(isProcessing) return;
 
                     const video = document.getElementById('video');
+                    const molduraEl = document.getElementById('moldura');
                     const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
                     
                     if(detection) {
-                        // --- ACRESCIMO: FILTROS DE INTENÇÃO (TAMANHO E CENTRALIZAÇÃO) ---
                         const box = detection.detection.box;
                         const vW = video.videoWidth;
                         const vH = video.videoHeight;
                         
-                        // 1. Ignora rostos pequenos (muito longe/ao fundo)
-                        if (box.height < (vH * 0.30)) return; 
-
-                        // 2. Foco apenas nos 60% centrais da câmera (ignora bordas laterais)
                         const faceCenterX = box.x + (box.width / 2);
-                        if (faceCenterX < (vW * 0.20) || faceCenterX > (vW * 0.80)) return;
+                        const faceCenterY = box.y + (box.height / 2);
+                        const enquadradoH = faceCenterX > (vW * 0.35) && faceCenterX < (vW * 0.65);
+                        const enquadradoV = faceCenterY > (vH * 0.30) && faceCenterY < (vH * 0.70);
+                        const tamanhoCerto = box.height > (vH * 0.40); // Rigor de proximidade
 
-                        const match = faceMatcher.findBestMatch(detection.descriptor);
-                        const agora = Date.now();
+                        if (enquadradoH && enquadradoV && tamanhoCerto) {
+                            molduraEl.classList.add('detected');
+                            const match = faceMatcher.findBestMatch(detection.descriptor);
+                            
+                            if(match.label !== 'unknown') {
+                                const nome = match.label;
+                                const agora = Date.now();
+                                if(nome === ultimoNomeDetectado && (agora - tempoUltimaDeteccao) < 30000) return;
 
-                        if(match.label !== 'unknown') {
-                            const nome = match.label;
-                            if(nome === ultimoNomeDetectado && (agora - tempoUltimaDeteccao) < 10000) return;
-
-                            isProcessing = true;
-                            const info = mapaAlunos[nome];
-                            const hoje = new Date().toLocaleDateString('pt-BR');
-                            const dataObj = new Date();
-                            const hora = dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
-                            const qPresenca = query(collection(db, "frequencia"), where("nome", "==", nome), where("data", "==", hoje), where("escolaId", "==", logado.escolaId));
-                            const presencaSnap = await getDocs(qPresenca);
-
-                            if (!presencaSnap.empty) {
-                                document.getElementById('display').innerHTML = `<div class="card-bloqueio"><h2 class="fw-bold mb-1">JÁ REGISTRADO</h2><p class="mb-0">${nome.toUpperCase()}</p></div>`;
-                                setTimeout(() => { resetDisplay(); }, 2000);
-                                return;
+                                isProcessing = true;
+                                processarPresenca(nome, mapaAlunos[nome]);
                             }
-
-                            document.getElementById('display').innerHTML = `<div class="card-aluno"><h2 class="fw-bold mb-1">BEM-VINDO(A)</h2><p class="mb-0">${nome.toUpperCase()}</p><small class="d-block mt-2" id="msg-status">Sincronizando...</small></div>`;
-
-                            await addDoc(collection(db, "frequencia"), { nome, sala: info.sala, escolaId: logado.escolaId, data: hoje, hora, dataHora: serverTimestamp() });
-
-                            if (configEscola && configEscola.mensagensAtivas && info.telResp) {
-                                agendarNotificacao(info.telResp, nome, hora);
-                            }
-
-                            ultimoNomeDetectado = nome;
-                            tempoUltimaDeteccao = agora;
-                            setTimeout(() => { resetDisplay(); }, 2000); 
+                        } else {
+                            molduraEl.classList.remove('detected');
                         }
+                    } else {
+                        molduraEl.classList.remove('detected');
                     }
-                }, 800); // Intervalo de varredura para evitar capturas por acidente
-            } catch (err) { console.error(err); isProcessing = false; }
+                }, 600);
+            } catch (err) { console.error(err); }
         }
 
-        // --- ACRESCIMO: SISTEMA DE CAIXA DE SAÍDA RESILIENTE (BACKUP LOCAL) ---
+        async function processarPresenca(nome, info) {
+            const hoje = new Date().toLocaleDateString('pt-BR');
+            const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+            const q = query(collection(db, "frequencia"), where("nome", "==", nome), where("data", "==", hoje), where("escolaId", "==", logado.escolaId));
+            const snap = await getDocs(q);
+
+            if (!snap.empty) {
+                document.getElementById('display').innerHTML = `<div class="card-bloqueio"><h2>JÁ REGISTRADO</h2><p>${nome.toUpperCase()}</p></div>`;
+            } else {
+                document.getElementById('display').innerHTML = `<div class="card-aluno"><h2>BEM-VINDO(A)</h2><p>${nome.toUpperCase()}</p></div>`;
+                await addDoc(collection(db, "frequencia"), { nome, sala: info.sala, escolaId: logado.escolaId, data: hoje, hora, dataHora: serverTimestamp() });
+                if (configEscola.mensagensAtivas && info.telResp) agendarNotificacao(info.telResp, nome, hora);
+            }
+            
+            ultimoNomeDetectado = nome;
+            tempoUltimaDeteccao = Date.now();
+            setTimeout(resetDisplay, 3000);
+        }
+
         function agendarNotificacao(tel, nome, hora) {
-            let filaLocal = JSON.parse(localStorage.getItem('caixa_saida_acessaedu') || "[]");
-            const novaTarefa = { id: Date.now() + Math.random(), tel, nome, hora };
-            filaLocal.push(novaTarefa);
-            localStorage.setItem('caixa_saida_acessaedu', JSON.stringify(filaLocal));
+            let fila = JSON.parse(localStorage.getItem('caixa_saida_acessaedu') || "[]");
+            const tarefa = { id: Date.now(), tel, nome, hora };
+            fila.push(tarefa);
+            localStorage.setItem('caixa_saida_acessaedu', JSON.stringify(fila));
             atualizarStatusFilaVisual();
-            filaDeEnvio = filaDeEnvio.then(() => executarEnvio(novaTarefa));
-        }
-
-        async function processarFilaEsquecida() {
-            let filaLocal = JSON.parse(localStorage.getItem('caixa_saida_acessaedu') || "[]");
-            filaLocal.forEach(tarefa => { filaDeEnvio = filaDeEnvio.then(() => executarEnvio(tarefa)); });
+            filaDeEnvio = filaDeEnvio.then(() => executarEnvio(tarefa));
         }
 
         async function executarEnvio(tarefa) {
-            // --- ACRESCIMO: 10 TEMPOS ALEATÓRIOS (ANTI-BAN) ---
-            const tempos = [3, 5, 8, 12, 15, 20, 2, 4, 10, 18]; 
+            // --- VARIÁVEL DE TEMPO ALEATÓRIO (5 A 25 SEGUNDOS) ---
+            const tempos = [5, 8, 12, 15, 20, 25, 7, 10, 18, 22]; 
             const delay = tempos[Math.floor(Math.random() * tempos.length)];
-            await new Promise(res => setTimeout(res, delay * 1000));
+            await new Promise(r => setTimeout(r, delay * 1000));
 
-            const sucesso = await enviarNotificacaoZAPI(tarefa.tel, tarefa.nome, tarefa.hora);
-            
+            const sucesso = await enviarNotificacaoHibrida(tarefa.tel, tarefa.nome, tarefa.hora);
             if(sucesso) {
-                let filaLocal = JSON.parse(localStorage.getItem('caixa_saida_acessaedu') || "[]");
-                filaLocal = filaLocal.filter(t => t.id !== tarefa.id);
-                localStorage.setItem('caixa_saida_acessaedu', JSON.stringify(filaLocal));
+                let fila = JSON.parse(localStorage.getItem('caixa_saida_acessaedu') || "[]").filter(t => t.id !== tarefa.id);
+                localStorage.setItem('caixa_saida_acessaedu', JSON.stringify(fila));
                 atualizarStatusFilaVisual();
             }
         }
 
-        function atualizarStatusFilaVisual() {
-            let filaLocal = JSON.parse(localStorage.getItem('caixa_saida_acessaedu') || "[]");
-            const el = document.getElementById('status-fila');
-            if(el) el.innerText = filaLocal.length > 0 ? `📦 Caixa de saída: ${filaLocal.length} pendentes` : "";
-        }
+        async function enviarNotificacaoHibrida(telefone, alunoNome, hora) {
+            if (!configEscola.mensagensAtivas) return false;
 
-        function resetDisplay() {
-            const display = document.getElementById('display');
-            if(display) {
-                display.innerHTML = `<p class="fs-4 fw-bold mt-3" style="opacity: 0.8;">Aguardando identificação...</p><div id="status-fila" class="fila-badge"></div>`; 
-                atualizarStatusFilaVisual();
-            }
-            isProcessing = false;
-        }
-
-        async function enviarNotificacaoZAPI(telefone, alunoNome, hora) {
-            if (!configEscola.zapiApi || !configEscola.zapiInstance) return false;
-
-            // --- ACRESCIMO: VARIABILIDADE TOTAL DE MENSAGENS (SPINTAX) ---
-            const s = ["Olá!", "Bom dia!", "Tudo bem?", "Oi!", "Olá, tudo certo?", "Atenção:"][Math.floor(Math.random()*6)];
+            // --- VARIABILIDADE MÁXIMA (ANTI-BAN) ---
+            const s = ["Olá!", "Bom dia!", "Tudo bem?", "Oi!", "Saudações!", "Olá, tudo certo?"][Math.floor(Math.random()*6)];
             const c = [
-                `confirmamos que *${alunoNome.toUpperCase()}* registrou entrada na instituição *${configEscola.nome}*.`, 
-                `informamos que o(a) aluno(a) *${alunoNome.toUpperCase()}* já se encontra na instituição *${configEscola.nome}*.`,
-                `notificamos a entrada de *${alunoNome.toUpperCase()}* na unidade *${configEscola.nome}*.`,
-                `registro de presença realizado para *${alunoNome.toUpperCase()}* na escola *${configEscola.nome}*.`
+                `confirmamos que *${alunoNome.toUpperCase()}* entrou na unidade *${configEscola.nome}*.`, 
+                `informamos que o(a) aluno(a) *${alunoNome.toUpperCase()}* já está na instituição *${configEscola.nome}*.`,
+                `registro de presença realizado para *${alunoNome.toUpperCase()}* na escola *${configEscola.nome}*.`,
+                `notificamos a chegada de *${alunoNome.toUpperCase()}* na unidade *${configEscola.nome}*.`
             ][Math.floor(Math.random()*4)];
             const i = [
                 "Por favor, responda com um *'OK'*.", 
                 "Pode nos dar um retorno com um *'SIM'* por favor?", 
                 "Responda com um *'OK'* para confirmarmos o recebimento.",
-                "Tudo certo? Responda com um *'OK'*."
+                "Tudo certo? Apenas um *'OK'* basta."
             ][Math.floor(Math.random()*4)];
             const r = [
                 "🤝 Escola e família conectadas.", 
-                "✅ Notificação automática gerada pelo sistema AcessaEdu.",
-                "📌 Salve nosso número para garantir o recebimento dos avisos."
-            ][Math.floor(Math.random()*3)];
+                "✅ Notificação automática - AcessaEdu.",
+                "📌 Salve nosso número oficial.",
+                "🏫 Segurança e controle escolar."
+            ][Math.floor(Math.random()*4)];
             
             const hash = Math.random().toString(36).substring(7).toUpperCase();
 
-            const mensagem = `*AcessaEdu | Notificação Escolar* 🏫\n\n` +
-                             `${s} ${c}\n\n` +
-                             `📅 *Data:* ${new Date().toLocaleDateString('pt-BR')}\n` +
-                             `⏰ *Hora:* ${hora}\n\n` +
-                             `${i}\n\n` +
-                             `${r}\n` +
-                             `_Reg: ${hash}_`;
+            const msgFinal = `*AcessaEdu | Notificação* 🏫\n\n${s} ${c}\n\n📅 *Data:* ${new Date().toLocaleDateString('pt-BR')}\n⏰ *Hora:* ${hora}\n\n${i}\n\n${r}\n_Reg: ${hash}_`;
+
+            let num = telefone.replace(/\D/g, ''); if (num.length === 11) num = num.substring(0, 2) + num.substring(3);
+            const numFinal = "55" + num;
 
             try {
-                let aB = configEscola.zapiApi.trim().split('/instances')[0].replace(/\/+$/, "");
-                const ep = `${aB}/instances/${configEscola.zapiInstance}/token/${configEscola.zapiToken}/send-text`;
-                let num = telefone.replace(/\D/g, ''); if (num.length === 11) num = num.substring(0, 2) + num.substring(3);
-                
-                const res = await fetch(ep, { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json', 'Client-Token': configEscola.zapiSecurity || '' }, 
-                    body: JSON.stringify({ phone: "55" + num, message: mensagem, delayMessage: 5, delayTyping: 3 }) 
-                });
-                return res.ok;
+                if (configEscola.apiUrl && configEscola.apiToken) {
+                    const res = await fetch(configEscola.apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${configEscola.apiToken}` },
+                        body: JSON.stringify({ number: numFinal, message: msgFinal })
+                    });
+                    return res.ok;
+                } else if (configEscola.zapiApi && configEscola.zapiInstance) {
+                    const ep = `${configEscola.zapiApi.split('/instances')[0]}/instances/${configEscola.zapiInstance}/token/${configEscola.zapiToken}/send-text`;
+                    const res = await fetch(ep, { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json', 'Client-Token': configEscola.zapiSecurity || '' }, 
+                        body: JSON.stringify({ phone: numFinal, message: msgFinal, delayMessage: 5, delayTyping: 3 }) 
+                    });
+                    return res.ok;
+                }
+                return false;
             } catch (e) { return false; }
         }
+
+        function atualizarStatusFilaVisual() {
+            const f = JSON.parse(localStorage.getItem('caixa_saida_acessaedu') || "[]");
+            const el = document.getElementById('status-fila');
+            if(el) el.innerText = f.length > 0 ? `📦 Pendentes: ${f.length}` : "";
+        }
+
+        function processarFilaEsquecida() {
+            const f = JSON.parse(localStorage.getItem('caixa_saida_acessaedu') || "[]");
+            f.forEach(t => { filaDeEnvio = filaDeEnvio.then(() => executarEnvio(t)); });
+        }
+
+        function resetDisplay() {
+            document.getElementById('display').innerHTML = `<p class="fs-5 fw-bold mt-3">Aguardando enquadramento...</p><div id="status-fila" style="font-size: 0.7rem; opacity: 0.7;"></div>`;
+            atualizarStatusFilaVisual();
+            isProcessing = false;
+        }
+        
+        async function enviarNotificacaoZAPI(t, n, h) { return await enviarNotificacaoHibrida(t, n, h); }
     </script>
 </body>
 </html>
