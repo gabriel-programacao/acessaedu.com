@@ -81,7 +81,7 @@
                 if(snap.exists()) {
                     configEscola = snap.data();
                     initTerminal();
-                    processarFilaEsquecida(); // Recupera pendentes após atualizar página
+                    processarFilaEsquecida(); // Recupera pendentes após atualizar página ou queda de net
                 }
             } catch (e) { console.error(e); }
         }
@@ -113,11 +113,10 @@
                     return;
                 }
 
-                // AJUSTE DE PRECISÃO: DE 0.55 PARA 0.65 (Exige mais certeza da IA para validar o rosto)
-                const faceMatcher = new faceapi.FaceMatcher(labledDescriptors, 0.65);
+                // --- ACRESCIMO: REGUA DE PRECISÃO EM 80% ---
+                const faceMatcher = new faceapi.FaceMatcher(labledDescriptors, 0.80);
                 document.getElementById('loading').style.display = 'none';
                 
-                // INTERVALO DE VARREDURA AJUSTADO PARA 800ms (Evita capturas acidentais de quem está só passando)
                 setInterval(async () => {
                     if(isProcessing) return;
 
@@ -125,6 +124,18 @@
                     const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
                     
                     if(detection) {
+                        // --- ACRESCIMO: FILTROS DE INTENÇÃO (TAMANHO E CENTRALIZAÇÃO) ---
+                        const box = detection.detection.box;
+                        const vW = video.videoWidth;
+                        const vH = video.videoHeight;
+                        
+                        // 1. Ignora rostos pequenos (muito longe/ao fundo)
+                        if (box.height < (vH * 0.30)) return; 
+
+                        // 2. Foco apenas nos 60% centrais da câmera (ignora bordas laterais)
+                        const faceCenterX = box.x + (box.width / 2);
+                        if (faceCenterX < (vW * 0.20) || faceCenterX > (vW * 0.80)) return;
+
                         const match = faceMatcher.findBestMatch(detection.descriptor);
                         const agora = Date.now();
 
@@ -138,45 +149,21 @@
                             const dataObj = new Date();
                             const hora = dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-                            const qPresenca = query(
-                                collection(db, "frequencia"), 
-                                where("nome", "==", nome), 
-                                where("data", "==", hoje),
-                                where("escolaId", "==", logado.escolaId)
-                            );
+                            const qPresenca = query(collection(db, "frequencia"), where("nome", "==", nome), where("data", "==", hoje), where("escolaId", "==", logado.escolaId));
                             const presencaSnap = await getDocs(qPresenca);
 
                             if (!presencaSnap.empty) {
-                                document.getElementById('display').innerHTML = `
-                                    <div class="card-bloqueio">
-                                        <h2 class="fw-bold mb-1">JÁ REGISTRADO</h2>
-                                        <p class="mb-0">${nome.toUpperCase()}</p>
-                                    </div>`;
+                                document.getElementById('display').innerHTML = `<div class="card-bloqueio"><h2 class="fw-bold mb-1">JÁ REGISTRADO</h2><p class="mb-0">${nome.toUpperCase()}</p></div>`;
                                 setTimeout(() => { resetDisplay(); }, 2000);
                                 return;
                             }
 
-                            document.getElementById('display').innerHTML = `
-                                <div class="card-aluno">
-                                    <h2 class="fw-bold mb-1">BEM-VINDO(A)</h2>
-                                    <p class="mb-0">${nome.toUpperCase()}</p>
-                                    <small class="d-block mt-2" id="msg-status">Sincronizando presença...</small>
-                                </div>`;
+                            document.getElementById('display').innerHTML = `<div class="card-aluno"><h2 class="fw-bold mb-1">BEM-VINDO(A)</h2><p class="mb-0">${nome.toUpperCase()}</p><small class="d-block mt-2" id="msg-status">Sincronizando...</small></div>`;
 
-                            await addDoc(collection(db, "frequencia"), { 
-                                nome, 
-                                sala: info.sala, 
-                                escolaId: logado.escolaId, 
-                                data: hoje, 
-                                hora, 
-                                dataHora: serverTimestamp() 
-                            });
+                            await addDoc(collection(db, "frequencia"), { nome, sala: info.sala, escolaId: logado.escolaId, data: hoje, hora, dataHora: serverTimestamp() });
 
                             if (configEscola && configEscola.mensagensAtivas && info.telResp) {
                                 agendarNotificacao(info.telResp, nome, hora);
-                            } else {
-                                const el = document.getElementById('msg-status');
-                                if(el) el.innerText = "Presença confirmada! ✅";
                             }
 
                             ultimoNomeDetectado = nome;
@@ -184,31 +171,29 @@
                             setTimeout(() => { resetDisplay(); }, 2000); 
                         }
                     }
-                }, 800); 
+                }, 800); // Intervalo de varredura para evitar capturas por acidente
             } catch (err) { console.error(err); isProcessing = false; }
         }
 
+        // --- ACRESCIMO: SISTEMA DE CAIXA DE SAÍDA RESILIENTE (BACKUP LOCAL) ---
         function agendarNotificacao(tel, nome, hora) {
             let filaLocal = JSON.parse(localStorage.getItem('caixa_saida_acessaedu') || "[]");
             const novaTarefa = { id: Date.now() + Math.random(), tel, nome, hora };
             filaLocal.push(novaTarefa);
             localStorage.setItem('caixa_saida_acessaedu', JSON.stringify(filaLocal));
-            
             atualizarStatusFilaVisual();
             filaDeEnvio = filaDeEnvio.then(() => executarEnvio(novaTarefa));
         }
 
         async function processarFilaEsquecida() {
             let filaLocal = JSON.parse(localStorage.getItem('caixa_saida_acessaedu') || "[]");
-            filaLocal.forEach(tarefa => {
-                filaDeEnvio = filaDeEnvio.then(() => executarEnvio(tarefa));
-            });
+            filaLocal.forEach(tarefa => { filaDeEnvio = filaDeEnvio.then(() => executarEnvio(tarefa)); });
         }
 
         async function executarEnvio(tarefa) {
+            // --- ACRESCIMO: 10 TEMPOS ALEATÓRIOS (ANTI-BAN) ---
             const tempos = [3, 5, 8, 12, 15, 20, 2, 4, 10, 18]; 
             const delay = tempos[Math.floor(Math.random() * tempos.length)];
-            
             await new Promise(res => setTimeout(res, delay * 1000));
 
             const sucesso = await enviarNotificacaoZAPI(tarefa.tel, tarefa.nome, tarefa.hora);
@@ -239,33 +224,26 @@
         async function enviarNotificacaoZAPI(telefone, alunoNome, hora) {
             if (!configEscola.zapiApi || !configEscola.zapiInstance) return false;
 
-            const saudacoes = ["Olá!", "Bom dia!", "Tudo bem?", "Oi!", "Olá, tudo certo?", "Atenção:", "Informativo Escolar:"];
-            const corpos = [
-                `confirmamos que *${alunoNome.toUpperCase()}* registrou entrada na instituição *${configEscola.nome}*.`,
+            // --- ACRESCIMO: VARIABILIDADE TOTAL DE MENSAGENS (SPINTAX) ---
+            const s = ["Olá!", "Bom dia!", "Tudo bem?", "Oi!", "Olá, tudo certo?", "Atenção:"][Math.floor(Math.random()*6)];
+            const c = [
+                `confirmamos que *${alunoNome.toUpperCase()}* registrou entrada na instituição *${configEscola.nome}*.`, 
                 `informamos que o(a) aluno(a) *${alunoNome.toUpperCase()}* já se encontra na instituição *${configEscola.nome}*.`,
-                `registro de entrada realizado para *${alunoNome.toUpperCase()}* na unidade *${configEscola.nome}*.`,
-                `acesso confirmado para *${alunoNome.toUpperCase()}* na instituição *${configEscola.nome}*.`,
-                `notificamos a entrada de *${alunoNome.toUpperCase()}* na escola *${configEscola.nome}*.`
-            ];
-
-            const interacoes = [
-                "Por favor, responda com um *'OK'* para confirmarmos o recebimento.",
-                "Pode nos dar um retorno com um *'SIM'* por favor?",
-                "Se puder, nos confirme com um *'RECEBIDO'* por gentileza.",
-                "Tudo certo com o horário? Responda com um *'OK'*."
-            ];
-
-            const rodapes = [
-                "📌 Salve nosso contato para garantir o recebimento dos avisos.",
-                "💡 Adicione este número à sua agenda para evitar o spam.",
-                "🤝 Escola e família conectadas. Salve nosso contato!",
-                "✅ Notificação automática gerada pelo sistema *AcessaEdu*."
-            ];
-
-            const s = saudacoes[Math.floor(Math.random() * saudacoes.length)];
-            const c = corpos[Math.floor(Math.random() * corpos.length)];
-            const i = interacoes[Math.floor(Math.random() * interacoes.length)];
-            const r = rodapes[Math.floor(Math.random() * rodapes.length)];
+                `notificamos a entrada de *${alunoNome.toUpperCase()}* na unidade *${configEscola.nome}*.`,
+                `registro de presença realizado para *${alunoNome.toUpperCase()}* na escola *${configEscola.nome}*.`
+            ][Math.floor(Math.random()*4)];
+            const i = [
+                "Por favor, responda com um *'OK'*.", 
+                "Pode nos dar um retorno com um *'SIM'* por favor?", 
+                "Responda com um *'OK'* para confirmarmos o recebimento.",
+                "Tudo certo? Responda com um *'OK'*."
+            ][Math.floor(Math.random()*4)];
+            const r = [
+                "🤝 Escola e família conectadas.", 
+                "✅ Notificação automática gerada pelo sistema AcessaEdu.",
+                "📌 Salve nosso número para garantir o recebimento dos avisos."
+            ][Math.floor(Math.random()*3)];
+            
             const hash = Math.random().toString(36).substring(7).toUpperCase();
 
             const mensagem = `*AcessaEdu | Notificação Escolar* 🏫\n\n` +
@@ -277,11 +255,11 @@
                              `_Reg: ${hash}_`;
 
             try {
-                let apiBase = configEscola.zapiApi.trim().split('/instances')[0].replace(/\/+$/, "");
-                const endpoint = `${apiBase}/instances/${configEscola.zapiInstance}/token/${configEscola.zapiToken}/send-text`;
+                let aB = configEscola.zapiApi.trim().split('/instances')[0].replace(/\/+$/, "");
+                const ep = `${aB}/instances/${configEscola.zapiInstance}/token/${configEscola.zapiToken}/send-text`;
                 let num = telefone.replace(/\D/g, ''); if (num.length === 11) num = num.substring(0, 2) + num.substring(3);
-
-                const res = await fetch(endpoint, { 
+                
+                const res = await fetch(ep, { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json', 'Client-Token': configEscola.zapiSecurity || '' }, 
                     body: JSON.stringify({ phone: "55" + num, message: mensagem, delayMessage: 5, delayTyping: 3 }) 
