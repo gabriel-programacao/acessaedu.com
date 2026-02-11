@@ -230,25 +230,12 @@
                             <div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="checkBib" onchange="window.recalcularTotal()"> <label class="form-check-label small">Biblioteca (+ R$ 50,00)</label></div>
                             <div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="checkMsg" onchange="window.toggleMensagensExtras()"> <label class="form-check-label small">Mensagens (0,40 p/ aluno)</label></div>
                             
-                            <div id="areaMensageria" style="display:none;" class="mt-3 p-3 bg-white rounded-3 border">
-                                <ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
-                                    <li class="nav-item" role="presentation"><button class="nav-link active py-1 small" data-bs-toggle="pill" data-bs-target="#pills-avisa" type="button">AVISA API</button></li>
-                                    <li class="nav-item" role="presentation"><button class="nav-link py-1 small" data-bs-toggle="pill" data-bs-target="#pills-zapi" type="button">Z-API (Legado)</button></li>
-                                </ul>
-                                <div class="tab-content">
-                                    <div class="tab-pane fade show active" id="pills-avisa">
-                                        <label class="small fw-bold text-success mb-1">AVISA API CONFIG</label>
-                                        <input type="text" id="nApiUrl" class="form-control form-control-lux mb-2 py-2" placeholder="URL da API">
-                                        <input type="text" id="nApiToken" class="form-control form-control-lux mb-2 py-2" placeholder="Bearer Token">
-                                    </div>
-                                    <div class="tab-pane fade" id="pills-zapi">
-                                        <label class="small fw-bold text-primary mb-1">Z-API CONFIG</label>
-                                        <input type="text" id="nZapiApi" class="form-control form-control-lux mb-2 py-2" placeholder="URL da Instância">
-                                        <input type="text" id="nZapiInstance" class="form-control form-control-lux mb-2 py-2" placeholder="ID Instância">
-                                        <input type="text" id="nZapiToken" class="form-control form-control-lux mb-2 py-2" placeholder="Token Instância">
-                                        <input type="text" id="nZapiSecurity" class="form-control form-control-lux py-2" placeholder="Token de Segurança">
-                                    </div>
-                                </div>
+                            <div id="camposZapi" style="display:none;" class="mt-3 p-3 bg-white rounded-3 border">
+                                <label class="small fw-bold text-success mb-2">CONFIGURAÇÃO Z-API</label>
+                                <input type="text" id="nZapiApi" class="form-control form-control-lux mb-2 py-2" placeholder="API da Instância (https://...)">
+                                <input type="text" id="nZapiInstance" class="form-control form-control-lux mb-2 py-2" placeholder="ID da Instância">
+                                <input type="text" id="nZapiToken" class="form-control form-control-lux mb-2 py-2" placeholder="Token da Instância">
+                                <input type="text" id="nZapiSecurity" class="form-control form-control-lux py-2" placeholder="Token de Segurança da Conta">
                             </div>
 
                             <div class="mt-2 p-2 bg-white rounded-3 border text-center">
@@ -312,10 +299,10 @@
 
         onAuthStateChanged(auth, user => { if (!user || user.email !== "gabriel.tec.redes@gmail.com") window.location.href = 'index.html'; });
 
-        // --- ALTERAÇÃO: TOGGLE DE MENSAGENS ---
+        // --- MANUTENÇÃO: TOGGLE Z-API ---
         window.toggleMensagensExtras = () => {
             const isChecked = document.getElementById('checkMsg').checked;
-            document.getElementById('areaMensageria').style.display = isChecked ? 'block' : 'none';
+            document.getElementById('camposZapi').style.display = isChecked ? 'block' : 'none';
             window.recalcularTotal();
         };
 
@@ -428,10 +415,8 @@
             document.getElementById('nNome').value = ""; document.getElementById('nTurmas').value = "";
             document.getElementById('nZapiApi').value = ""; document.getElementById('nZapiInstance').value = "";
             document.getElementById('nZapiToken').value = ""; document.getElementById('nZapiSecurity').value = "";
-            // Reset Avisa
-            document.getElementById('nApiUrl').value = ""; document.getElementById('nApiToken').value = "";
             document.getElementById('checkMsg').checked = false;
-            document.getElementById('areaMensageria').style.display = 'none';
+            document.getElementById('camposZapi').style.display = 'none';
             window.recalcularTotal();
         };
 
@@ -455,12 +440,7 @@
             document.getElementById('nZapiInstance').value = e.zapiInstance || "";
             document.getElementById('nZapiToken').value = e.zapiToken || "";
             document.getElementById('nZapiSecurity').value = e.zapiSecurity || "";
-            
-            // --- ACRESCIMO: CARREGAR AVISA API ---
-            document.getElementById('nApiUrl').value = e.apiUrl || "";
-            document.getElementById('nApiToken').value = e.apiToken || "";
-
-            document.getElementById('areaMensageria').style.display = e.mensagensAtivas ? 'block' : 'none';
+            document.getElementById('camposZapi').style.display = e.mensagensAtivas ? 'block' : 'none';
 
             new bootstrap.Modal(document.getElementById('modalNovoCadastro')).show();
         };
@@ -482,10 +462,7 @@
                 zapiApi: document.getElementById('nZapiApi').value.trim(),
                 zapiInstance: document.getElementById('nZapiInstance').value.trim(),
                 zapiToken: document.getElementById('nZapiToken').value.trim(),
-                zapiSecurity: document.getElementById('nZapiSecurity').value.trim(),
-                // --- ACRESCIMO: SALVAR AVISA API ---
-                apiUrl: document.getElementById('nApiUrl').value.trim(),
-                apiToken: document.getElementById('nApiToken').value.trim()
+                zapiSecurity: document.getElementById('nZapiSecurity').value.trim()
             };
             if(!document.getElementById('nID').readOnly && document.getElementById('nEmail').value) {
                 try {

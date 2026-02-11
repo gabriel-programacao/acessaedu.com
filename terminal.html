@@ -12,23 +12,17 @@
     <style>
         :root { --pe-blue: #003399; --pe-yellow: #ffcc00; --pe-green: #10b981; --pe-red: #cc0000; }
         body { background: linear-gradient(135deg, var(--pe-blue) 0%, #001a4d 100%); color: white; font-family: 'Poppins', sans-serif; height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 0; }
-        
         .terminal-container { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(15px); border-radius: 40px; padding: 40px; border: 1px solid rgba(255, 255, 255, 0.2); width: 95%; max-width: 700px; text-align: center; box-shadow: 0 25px 50px rgba(0,0,0,0.3); position: relative; }
-        
         .video-wrapper { position: relative; width: 100%; border-radius: 25px; overflow: hidden; border: 5px solid white; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
         video { width: 100%; transform: scaleX(-1); background: #000; display: block; }
-
         .face-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 10; }
         .face-cutout { width: 250px; height: 320px; border: 4px dashed rgba(255, 255, 255, 0.5); border-radius: 120px; box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.5); position: relative; transition: 0.3s; }
         .face-cutout.detected { border-color: var(--pe-green); border-style: solid; box-shadow: 0 0 0 1000px rgba(16, 185, 129, 0.2); }
-        
         .scan-line { position: absolute; width: 100%; height: 4px; background: rgba(255, 255, 255, 0.5); top: 0; animation: scanning 3s linear infinite; }
         @keyframes scanning { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
-
         .feedback-area { margin-top: 20px; min-height: 120px; }
         .card-aluno { background: var(--pe-green); color: white; padding: 15px; border-radius: 20px; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .card-bloqueio { background: var(--pe-red); color: white; padding: 15px; border-radius: 20px; animation: shake 0.5s ease-in-out; }
-        
         .btn-voltar { position: fixed; top: 20px; left: 20px; background: rgba(255,255,255,0.2); color: white; border-radius: 30px; padding: 8px 20px; text-decoration: none; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.3); z-index: 100; }
         @keyframes popIn { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; scale(1); } }
     </style>
@@ -39,17 +33,14 @@
 
     <div class="terminal-container">
         <div class="logo-terminal mb-3"><img src="logo_acessaedu.png" alt="AcessaEdu" style="max-height: 60px;"></div>
-        
         <div class="video-wrapper">
             <video id="video" autoplay muted playsinline></video>
             <div class="face-overlay">
                 <div class="face-cutout" id="moldura"><div class="scan-line"></div></div>
             </div>
         </div>
-
         <div class="feedback-area" id="display">
-            <p class="fs-5 fw-bold mt-3" id="instrucao">Aguardando enquadramento...</p>
-            <div id="status-fila" style="font-size: 0.7rem; opacity: 0.7;"></div>
+            <p class="fs-5 fw-bold mt-3" id="instrucao">Posicione o rosto na moldura</p>
         </div>
     </div>
 
@@ -58,15 +49,7 @@
         import { getFirestore, collection, getDocs, getDoc, doc, addDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        const firebaseConfig = { 
-            apiKey: "AIzaSyDgR98RtL8sgxVbEV2Swyb2wnHLSPt3cDo", 
-            authDomain: "escolapro-15e5e.firebaseapp.com", 
-            projectId: "escolapro-15e5e", 
-            storageBucket: "escolapro-15e5e.firebasestorage.app", 
-            messagingSenderId: "339019791514", 
-            appId: "1:339019791514:web:44e0d58b6835f0fe6df323" 
-        };
-
+        const firebaseConfig = { apiKey: "AIzaSyDgR98RtL8sgxVbEV2Swyb2wnHLSPt3cDo", authDomain: "escolapro-15e5e.firebaseapp.com", projectId: "escolapro-15e5e", storageBucket: "escolapro-15e5e.firebasestorage.app", messagingSenderId: "339019791514", appId: "1:339019791514:web:44e0d58b6835f0fe6df323" };
         const app = initializeApp(firebaseConfig); 
         const db = getFirestore(app);
         const auth = getAuth(app);
@@ -76,7 +59,6 @@
         let tempoUltimaDeteccao = 0;
         let isProcessing = false;
         let configEscola = null;
-        let filaDeEnvio = Promise.resolve();
 
         onAuthStateChanged(auth, (user) => {
             if (user) carregarConfiguracoes();
@@ -91,7 +73,6 @@
                 if(snap.exists()) {
                     configEscola = snap.data();
                     initTerminal();
-                    processarFilaEsquecida();
                 }
             } catch (e) { console.error(e); }
         }
@@ -102,14 +83,11 @@
                 await faceapi.nets.tinyFaceDetector.loadFromUri(URL_MODELS);
                 await faceapi.nets.faceLandmark68Net.loadFromUri(URL_MODELS);
                 await faceapi.nets.faceRecognitionNet.loadFromUri(URL_MODELS);
-
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 document.getElementById('video').srcObject = stream;
-                
                 const snap = await getDocs(query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId)));
                 const mapaAlunos = {};
                 const labledDescriptors = [];
-
                 snap.forEach(d => {
                     const data = d.data();
                     if(data.descritor) {
@@ -117,45 +95,32 @@
                         labledDescriptors.push(new faceapi.LabeledFaceDescriptors(data.nome, [new Float32Array(data.descritor)]));
                     }
                 });
-
                 const faceMatcher = new faceapi.FaceMatcher(labledDescriptors, 0.60); 
-                
                 setInterval(async () => {
                     if(isProcessing) return;
-
                     const video = document.getElementById('video');
                     const molduraEl = document.getElementById('moldura');
                     const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-                    
                     if(detection) {
                         const box = detection.detection.box;
-                        const vW = video.videoWidth;
-                        const vH = video.videoHeight;
-                        
+                        const vW = video.videoWidth; const vH = video.videoHeight;
                         const faceCenterX = box.x + (box.width / 2);
                         const faceCenterY = box.y + (box.height / 2);
                         const enquadradoH = faceCenterX > (vW * 0.35) && faceCenterX < (vW * 0.65);
                         const enquadradoV = faceCenterY > (vH * 0.30) && faceCenterY < (vH * 0.70);
-                        const tamanhoCerto = box.height > (vH * 0.40); // Rigor de proximidade
-
+                        const tamanhoCerto = box.height > (vH * 0.40);
                         if (enquadradoH && enquadradoV && tamanhoCerto) {
                             molduraEl.classList.add('detected');
                             const match = faceMatcher.findBestMatch(detection.descriptor);
-                            
                             if(match.label !== 'unknown') {
                                 const nome = match.label;
                                 const agora = Date.now();
                                 if(nome === ultimoNomeDetectado && (agora - tempoUltimaDeteccao) < 30000) return;
-
                                 isProcessing = true;
                                 processarPresenca(nome, mapaAlunos[nome]);
                             }
-                        } else {
-                            molduraEl.classList.remove('detected');
-                        }
-                    } else {
-                        molduraEl.classList.remove('detected');
-                    }
+                        } else { molduraEl.classList.remove('detected'); }
+                    } else { molduraEl.classList.remove('detected'); }
                 }, 600);
             } catch (err) { console.error(err); }
         }
@@ -163,116 +128,104 @@
         async function processarPresenca(nome, info) {
             const hoje = new Date().toLocaleDateString('pt-BR');
             const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
             const q = query(collection(db, "frequencia"), where("nome", "==", nome), where("data", "==", hoje), where("escolaId", "==", logado.escolaId));
             const snap = await getDocs(q);
-
             if (!snap.empty) {
                 document.getElementById('display').innerHTML = `<div class="card-bloqueio"><h2>JÁ REGISTRADO</h2><p>${nome.toUpperCase()}</p></div>`;
             } else {
                 document.getElementById('display').innerHTML = `<div class="card-aluno"><h2>BEM-VINDO(A)</h2><p>${nome.toUpperCase()}</p></div>`;
                 await addDoc(collection(db, "frequencia"), { nome, sala: info.sala, escolaId: logado.escolaId, data: hoje, hora, dataHora: serverTimestamp() });
-                if (configEscola.mensagensAtivas && info.telResp) agendarNotificacao(info.telResp, nome, hora);
+                if (configEscola.mensagensAtivas && info.telResp) {
+                    enviarZapiImediato(info.telResp, nome, hora);
+                }
             }
-            
-            ultimoNomeDetectado = nome;
-            tempoUltimaDeteccao = Date.now();
+            ultimoNomeDetectado = nome; tempoUltimaDeteccao = Date.now();
             setTimeout(resetDisplay, 3000);
         }
 
-        function agendarNotificacao(tel, nome, hora) {
-            let fila = JSON.parse(localStorage.getItem('caixa_saida_acessaedu') || "[]");
-            const tarefa = { id: Date.now(), tel, nome, hora };
-            fila.push(tarefa);
-            localStorage.setItem('caixa_saida_acessaedu', JSON.stringify(fila));
-            atualizarStatusFilaVisual();
-            filaDeEnvio = filaDeEnvio.then(() => executarEnvio(tarefa));
-        }
+        async function enviarZapiImediato(telefone, alunoNome, hora) {
+            if (!configEscola.zapiApi || !configEscola.zapiInstance) return;
 
-        async function executarEnvio(tarefa) {
-            // --- VARIÁVEL DE TEMPO ALEATÓRIO (5 A 25 SEGUNDOS) ---
-            const tempos = [5, 8, 12, 15, 20, 25, 7, 10, 18, 22]; 
-            const delay = tempos[Math.floor(Math.random() * tempos.length)];
-            await new Promise(r => setTimeout(r, delay * 1000));
-
-            const sucesso = await enviarNotificacaoHibrida(tarefa.tel, tarefa.nome, tarefa.hora);
-            if(sucesso) {
-                let fila = JSON.parse(localStorage.getItem('caixa_saida_acessaedu') || "[]").filter(t => t.id !== tarefa.id);
-                localStorage.setItem('caixa_saida_acessaedu', JSON.stringify(fila));
-                atualizarStatusFilaVisual();
-            }
-        }
-
-        async function enviarNotificacaoHibrida(telefone, alunoNome, hora) {
-            if (!configEscola.mensagensAtivas) return false;
-
-            // --- VARIABILIDADE MÁXIMA (ANTI-BAN) ---
-            const s = ["Olá!", "Bom dia!", "Tudo bem?", "Oi!", "Saudações!", "Olá, tudo certo?"][Math.floor(Math.random()*6)];
-            const c = [
-                `confirmamos que *${alunoNome.toUpperCase()}* entrou na unidade *${configEscola.nome}*.`, 
-                `informamos que o(a) aluno(a) *${alunoNome.toUpperCase()}* já está na instituição *${configEscola.nome}*.`,
-                `registro de presença realizado para *${alunoNome.toUpperCase()}* na escola *${configEscola.nome}*.`,
-                `notificamos a chegada de *${alunoNome.toUpperCase()}* na unidade *${configEscola.nome}*.`
-            ][Math.floor(Math.random()*4)];
-            const i = [
-                "Por favor, responda com um *'OK'*.", 
-                "Pode nos dar um retorno com um *'SIM'* por favor?", 
-                "Responda com um *'OK'* para confirmarmos o recebimento.",
-                "Tudo certo? Apenas um *'OK'* basta."
-            ][Math.floor(Math.random()*4)];
-            const r = [
-                "🤝 Escola e família conectadas.", 
-                "✅ Notificação automática - AcessaEdu.",
-                "📌 Salve nosso número oficial.",
-                "🏫 Segurança e controle escolar."
-            ][Math.floor(Math.random()*4)];
-            
+            // --- VARIÁVEIS PARA AS MENSAGENS ---
+            const nomeU = alunoNome.toUpperCase();
+            const escolaU = configEscola.nome.toUpperCase();
+            const dataH = new Date().toLocaleDateString('pt-BR');
             const hash = Math.random().toString(36).substring(7).toUpperCase();
 
-            const msgFinal = `*AcessaEdu | Notificação* 🏫\n\n${s} ${c}\n\n📅 *Data:* ${new Date().toLocaleDateString('pt-BR')}\n⏰ *Hora:* ${hora}\n\n${i}\n\n${r}\n_Reg: ${hash}_`;
+            // --- LISTAS PARA ALEATORIEDADE (SPINTAX) ---
+            const saudações = ["Olá!", "Bom dia!", "Tudo bem?", "Oi!", "Olá, tudo certo?", "Saudações!", "Atenção Responsáveis:"];
+            const corpos = [
+                `registro de presença realizado para *${nomeU}* na escola *${escolaU}*.`,
+                `informamos que o(a) aluno(a) *${nomeU}* já está na instituição *${escolaU}*.`,
+                `confirmamos que *${nomeU}* registrou entrada na unidade *${escolaU}*.`,
+                `notificamos a chegada de *${nomeU}* para as atividades na escola *${escolaU}*.`,
+                `comunicamos que o(a) estudante *${nomeU}* iniciou o período letivo em *${escolaU}*.`
+            ];
+            const interacoes = [
+                "Por favor, responda com um *'OK'*.",
+                "Pode nos dar um retorno com um *'SIM'* por favor?",
+                "Responda com um *'OK'* para confirmarmos o recebimento.",
+                "Tudo certo com o horário? Responda com um *'OK'*.",
+                "Poderia nos confirmar o recebimento com um *'RECEBIDO'*?",
+                "Dê um retorno com *'TUDO CERTO'* para validação do sistema."
+            ];
+            const rodapes = [
+                "🤝 Escola e família conectadas.",
+                "📌 Salve nosso número oficial na sua agenda.",
+                "💡 Adicione este contato para evitar que as mensagens caiam no spam.",
+                "✅ Notificação automática gerada pelo sistema AcessaEdu.",
+                "🏫 Segurança e controle escolar avançando sempre com você."
+            ];
 
-            let num = telefone.replace(/\D/g, ''); if (num.length === 11) num = num.substring(0, 2) + num.substring(3);
-            const numFinal = "55" + num;
+            // --- ESCOLHA ALEATÓRIA ---
+            const s = saudações[Math.floor(Math.random() * saudações.length)];
+            const c = corpos[Math.floor(Math.random() * corpos.length)];
+            const i = interacoes[Math.floor(Math.random() * interacoes.length)];
+            const r = rodapes[Math.floor(Math.random() * rodapes.length)];
+
+            // --- MONTAGEM DA MENSAGEM FINAL ---
+            const msgFinal = `*AcessaEdu | Notificação* 🏫\n\n` +
+                             `${s} ${c}\n\n` +
+                             `📅 Data: ${dataH}\n` +
+                             `⏰ Hora: ${hora}\n\n` +
+                             `${i}\n\n` +
+                             `${r}\n` +
+                             `_Reg: ${hash}_`;
+
+            // --- TRATAMENTO DO NÚMERO ---
+            let num = "55" + telefone.replace(/\D/g, '').replace(/^55/, '');
+            if (num.length === 13) num = num.substring(0, 4) + num.substring(5);
+
+            // --- 15 TEMPOS ALEATÓRIOS (DELAY E TYPING) ---
+            const dZ = [6, 12, 18, 25, 8, 14, 20, 7, 28, 32, 5, 15, 23, 11, 19];
+            const tZ = [3, 5, 7, 4, 6, 3, 8, 5, 4, 6, 3, 7, 5, 4, 6];
+            const randomDelay = dZ[Math.floor(Math.random() * dZ.length)];
+            const randomTyping = tZ[Math.floor(Math.random() * tZ.length)];
 
             try {
-                if (configEscola.apiUrl && configEscola.apiToken) {
-                    const res = await fetch(configEscola.apiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${configEscola.apiToken}` },
-                        body: JSON.stringify({ number: numFinal, message: msgFinal })
-                    });
-                    return res.ok;
-                } else if (configEscola.zapiApi && configEscola.zapiInstance) {
-                    const ep = `${configEscola.zapiApi.split('/instances')[0]}/instances/${configEscola.zapiInstance}/token/${configEscola.zapiToken}/send-text`;
-                    const res = await fetch(ep, { 
-                        method: 'POST', 
-                        headers: { 'Content-Type': 'application/json', 'Client-Token': configEscola.zapiSecurity || '' }, 
-                        body: JSON.stringify({ phone: numFinal, message: msgFinal, delayMessage: 5, delayTyping: 3 }) 
-                    });
-                    return res.ok;
-                }
-                return false;
-            } catch (e) { return false; }
-        }
+                let baseUrl = configEscola.zapiApi.trim().split('/instances')[0].replace(/\/+$/, "");
+                const endpoint = `${baseUrl}/instances/${configEscola.zapiInstance}/token/${configEscola.zapiToken}/send-text`;
+                const headers = { 'Content-Type': 'application/json' };
+                if (configEscola.zapiSecurity) headers['Client-Token'] = configEscola.zapiSecurity;
 
-        function atualizarStatusFilaVisual() {
-            const f = JSON.parse(localStorage.getItem('caixa_saida_acessaedu') || "[]");
-            const el = document.getElementById('status-fila');
-            if(el) el.innerText = f.length > 0 ? `📦 Pendentes: ${f.length}` : "";
-        }
-
-        function processarFilaEsquecida() {
-            const f = JSON.parse(localStorage.getItem('caixa_saida_acessaedu') || "[]");
-            f.forEach(t => { filaDeEnvio = filaDeEnvio.then(() => executarEnvio(t)); });
+                // DISPARA PARA A Z-API
+                fetch(endpoint, { 
+                    method: 'POST', 
+                    headers: headers, 
+                    body: JSON.stringify({ 
+                        phone: num, 
+                        message: msgFinal, 
+                        delayMessage: randomDelay, 
+                        delayTyping: randomTyping 
+                    }) 
+                });
+            } catch (e) { console.error("Erro no disparo Z-API:", e); }
         }
 
         function resetDisplay() {
-            document.getElementById('display').innerHTML = `<p class="fs-5 fw-bold mt-3">Aguardando enquadramento...</p><div id="status-fila" style="font-size: 0.7rem; opacity: 0.7;"></div>`;
-            atualizarStatusFilaVisual();
+            document.getElementById('display').innerHTML = `<p class="fs-5 fw-bold mt-3">Posicione o rosto na moldura</p>`;
             isProcessing = false;
         }
-        
-        async function enviarNotificacaoZAPI(t, n, h) { return await enviarNotificacaoHibrida(t, n, h); }
     </script>
 </body>
 </html>
