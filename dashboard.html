@@ -707,6 +707,34 @@
         let turmaParaApagarGlobal = "";
         let configUnidadeGlobal = null;
 
+        // --- FUNÇÃO DE ENVIO PARA Z-API ANEXADA AO WINDOW ---
+        window.processarZapiAtraso = async (tel, msg) => {
+            if (!configUnidadeGlobal || !configUnidadeGlobal.zapiApi) return false;
+            try {
+                const endpoint = `${configUnidadeGlobal.zapiApi.trim().split('/instances')[0]}/instances/${configUnidadeGlobal.zapiInstance}/token/${configUnidadeGlobal.zapiToken}/send-text`;
+                let num = tel.replace(/\D/g, '');
+                if (num.length === 11) num = num.substring(0, 2) + num.substring(3);
+                
+                const headers = { 'Content-Type': 'application/json' };
+                if (configUnidadeGlobal.zapiSecurity) headers['Client-Token'] = configUnidadeGlobal.zapiSecurity;
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({ 
+                        phone: "55" + num, 
+                        message: msg, 
+                        delayMessage: 10,
+                        delayTyping: 5
+                    })
+                });
+                return response.ok;
+            } catch (e) { 
+                console.error("Erro no disparo Z-API:", e);
+                return false; 
+            }
+        };
+
         window.toggleMenu = () => { document.getElementById('sidebar').classList.toggle('show'); document.getElementById('overlay').classList.toggle('show'); };
         onAuthStateChanged(auth, (user) => { if (!user || !logado) window.location.href = 'index.html'; else initDashboard(); });
 
@@ -933,8 +961,6 @@
             if(ok) Swal.fire("Sucesso", "Notificação enviada!", "success");
             else Swal.fire("Erro", "Z-API indisponível.", "error");
         };
-
-        /* --- RESTANTE DO CÓDIGO (ESTUDANTES / RELATÓRIOS / ETC) --- */
 
         window.abrirModalFalta = (id, nome) => {
             document.getElementById('falta-alu-id').value = id;
@@ -1603,30 +1629,6 @@
                 await updateDoc(doc(db, "alunos", id), { ultimoEnvioAtraso: hoje, qtdAtrasoNotificada: qtd });
                 Swal.fire("Sucesso", "WhatsApp enviado!", "success");
             }
-        };
-
-        window.processarZapiAtraso = async (tel, msg) => {
-            if (!configUnidadeGlobal || !configUnidadeGlobal.zapiApi) return false;
-            try {
-                const endpoint = `${configUnidadeGlobal.zapiApi.trim().split('/instances')[0]}/instances/${configUnidadeGlobal.zapiInstance}/token/${configUnidadeGlobal.zapiToken}/send-text`;
-                let num = tel.replace(/\D/g, '');
-                if (num.length === 11) num = num.substring(0, 2) + num.substring(3);
-                
-                const headers = { 'Content-Type': 'application/json' };
-                if (configUnidadeGlobal.zapiSecurity) headers['Client-Token'] = configUnidadeGlobal.zapiSecurity;
-
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify({ 
-                        phone: "55" + num, 
-                        message: msg, 
-                        delayMessage: 10,
-                        delayTyping: 5
-                    })
-                });
-                return response.ok;
-            } catch (e) { return false; }
         };
 
         window.dispararNotificacoesMassaAtraso = async () => {
