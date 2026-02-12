@@ -203,7 +203,7 @@
         .modal-confirm-delete .modal-header { background: #fff5f5; color: var(--danger); border-radius: 32px 32px 0 0; border: none; padding: 25px; }
         .modal-confirm-delete .input-senha { background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 16px; padding: 12px; text-align: center; font-weight: 800; letter-spacing: 2px; }
 
-        /* NOVOS ESTILOS PARA RELATÓRIO DESIGNER */
+        /* RELATÓRIO DESIGNER */
         .relatorio-header-card {
             background: linear-gradient(135deg, #003399 0%, #001a4d 100%);
             border-radius: 20px;
@@ -245,7 +245,7 @@
             .bg-danger { color: red !important; }
         }
 
-        /* --- GESTÃO STYLE --- */
+        /* GESTÃO STYLE */
         .plan-card { border-left: 8px solid var(--accent); }
         .payment-card { border-left: 8px solid var(--success); }
 
@@ -420,6 +420,21 @@
             </div>
         </div>
 
+        <div id="sec-faltas-dia" class="secao">
+            <div class="card-premium">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h5 class="fw-bold m-0 text-danger"><i class="fas fa-user-clock me-2"></i>Faltas do Dia (por Turma)</h5>
+                        <small class="text-muted">Apenas alunos sem biometria e sem justificativa na data.</small>
+                    </div>
+                    <div>
+                        <input type="date" id="dataFaltaDia" class="form-control rounded-pill border-0 bg-light px-3" onchange="window.carregarFaltasDoDia()">
+                    </div>
+                </div>
+                <div id="accordionFaltasDia" class="accordion accordion-flush"></div>
+            </div>
+        </div>
+
         <div id="sec-gestao" class="secao">
             <div class="row g-4">
                 <div class="col-md-6">
@@ -532,6 +547,37 @@
                     </select>
                 </div>
                 <button class="btn btn-primary w-100 py-3 rounded-4 fw-bold" onclick="window.salvarJustificativa()">CONFIRMAR JUSTIFICATIVA</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalJustificarFaltaPeriodo" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content p-4 rounded-5 border-0 shadow-lg">
+                <h5 class="fw-bold mb-3 text-primary"><i class="fas fa-notes-medical me-2"></i>Justificar Ausências</h5>
+                <input type="hidden" id="falta-alu-id">
+                <p class="small text-muted" id="txt-alu-falta-nome">Aluno: ---</p>
+                
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="small fw-bold">DE:</label>
+                        <input type="date" id="falta-data-ini" class="form-control border-0 bg-light rounded-4">
+                    </div>
+                    <div class="col-6">
+                        <label class="small fw-bold">ATÉ:</label>
+                        <input type="date" id="falta-data-fim" class="form-control border-0 bg-light rounded-4">
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="small fw-bold">MOTIVO DO ABONO</label>
+                    <select id="falta-motivo-select" class="form-select border-0 bg-light rounded-4">
+                        <option value="Atestado Médico">Atestado Médico</option>
+                        <option value="Declaração dos Pais">Declaração dos Pais</option>
+                        <option value="Problemas de Saúde">Problemas de Saúde</option>
+                        <option value="Motivos Familiares">Motivos Familiares</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary w-100 py-3 rounded-4 fw-bold" onclick="window.confirmarJustificativaFalta()">ABONAR PERÍODO</button>
             </div>
         </div>
     </div>
@@ -651,7 +697,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, updateDoc, onSnapshot, query, where, getDoc, writeBatch, serverTimestamp, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, updateDoc, onSnapshot, query, where, getDoc, writeBatch, serverTimestamp, getCountFromServer, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
         const firebaseConfig = { apiKey: "AIzaSyDgR98RtL8sgxVbEV2Swyb2wnHLSPt3cDo", authDomain: "escolapro-15e5e.firebaseapp.com", projectId: "escolapro-15e5e", storageBucket: "escolapro-15e5e.firebasestorage.app", messagingSenderId: "339019791514", appId: "1:339019791514:web:44e0d58b6835f0fe6df323" };
@@ -669,6 +715,7 @@
             document.getElementById('school-display').innerText = logado.escolaId.toUpperCase();
             document.getElementById('data-atual').innerText = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', day: 'numeric' });
             document.getElementById('relData').valueAsDate = new Date();
+            document.getElementById('dataFaltaDia').valueAsDate = new Date();
             
             onSnapshot(doc(db, "unidades", logado.escolaId), (docSnap) => {
                 if (docSnap.exists()) {
@@ -733,7 +780,194 @@
                 }
             } catch (e) {}
             initIA(); escutarDados(); escutarBroadcast(); escutarAtrasosRecorrentes();
+            window.carregarFaltasDoDia();
         }
+
+        /* --- LÓGICA DE FALTAS DO DIA REFORMULADA --- */
+
+        window.carregarFaltasDoDia = async () => {
+            const dataSelStr = document.getElementById('dataFaltaDia').value;
+            if(!dataSelStr) return;
+            const dataFormatada = new Date(dataSelStr + 'T12:00:00').toLocaleDateString('pt-BR');
+            const accordion = document.getElementById('accordionFaltasDia');
+            accordion.innerHTML = '<div class="text-center py-5"><i class="fas fa-spinner fa-spin fa-2x"></i><br>Analisando turmas...</div>';
+
+            try {
+                const qAlunos = query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId));
+                const snapAlunos = await getDocs(qAlunos);
+                const qPres = query(collection(db, "frequencia"), where("escolaId", "==", logado.escolaId), where("data", "==", dataFormatada));
+                const snapPres = await getDocs(qPres);
+                
+                const logEnviosRef = doc(db, "unidades", logado.escolaId, "log_envio_faltas", dataFormatada.replaceAll('/','-'));
+                const snapEnvio = await getDoc(logEnviosRef);
+                const enviosTurma = snapEnvio.exists() ? snapEnvio.data() : {};
+
+                const nomesPresentes = new Set();
+                snapPres.forEach(d => nomesPresentes.add(d.data().nome));
+
+                const turmas = {};
+                snapAlunos.forEach(docAlu => {
+                    const alu = docAlu.data();
+                    const justificativas = alu.justificativasFalta || [];
+                    
+                    if(!nomesPresentes.has(alu.nome) && !justificativas.includes(dataFormatada)) {
+                        if(!turmas[alu.sala]) turmas[alu.sala] = [];
+                        turmas[alu.sala].push({ id: docAlu.id, ...alu });
+                    }
+                });
+
+                accordion.innerHTML = "";
+                const sortedTurmas = Object.keys(turmas).sort();
+
+                if(sortedTurmas.length === 0) {
+                    accordion.innerHTML = '<div class="alert alert-success m-3">Nenhuma falta pendente para esta data.</div>';
+                    return;
+                }
+
+                sortedTurmas.forEach(sala => {
+                    const idS = sala.replace(/\s+/g, '-');
+                    const jaEnviado = enviosTurma[sala];
+                    const corBotao = jaEnviado ? 'btn-success' : 'btn-danger';
+                    const textoBotao = jaEnviado ? `<i class="fas fa-check-circle"></i> ENVIADO AS ${jaEnviado}` : `<i class="fas fa-paper-plane"></i> NOTIFICAR TURMA`;
+
+                    let rows = "";
+                    turmas[sala].forEach(al => {
+                        rows += `
+                        <tr>
+                            <td class="ps-4 fw-bold small text-uppercase">${al.nome}</td>
+                            <td>${al.tel || '---'}</td>
+                            <td class="text-end pe-4">
+                                <button class="btn btn-sm btn-light text-warning me-2" onclick="window.abrirModalFalta('${al.id}','${al.nome}')" title="Abonar Período"><i class="fas fa-notes-medical"></i></button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="window.notificarFaltaUnica('${al.id}', '${al.nome}', '${al.tel}')"><i class="fas fa-paper-plane"></i></button>
+                            </td>
+                        </tr>`;
+                    });
+
+                    accordion.innerHTML += `
+                    <div class="accordion-item border-0 mb-3 shadow-sm rounded-4 overflow-hidden">
+                        <div class="d-flex align-items-center bg-white pe-3">
+                            <h2 class="accordion-header flex-grow-1">
+                                <button class="accordion-button collapsed fw-bold text-primary py-4 px-4 bg-white" type="button" data-bs-toggle="collapse" data-bs-target="#accF-${idS}">
+                                    <i class="fas fa-users me-2"></i> ${sala} (${turmas[sala].length} FALTAS)
+                                </button>
+                            </h2>
+                            <button class="btn ${corBotao} rounded-pill px-4 fw-bold shadow-sm btn-sm" onclick="window.dispararTurmaMassa('${sala}', '${idS}')" ${jaEnviado ? 'disabled' : ''}>
+                                ${textoBotao}
+                            </button>
+                        </div>
+                        <div id="accF-${idS}" class="accordion-collapse collapse">
+                            <div class="accordion-body p-0">
+                                <table class="table-estudantes mb-0">
+                                    <thead><tr><th class="ps-4 small opacity-50">ALUNO</th><th class="small opacity-50">RESPONSÁVEL</th><th class="text-end pe-4 small opacity-50">AÇÕES</th></tr></thead>
+                                    <tbody>${rows}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+
+            } catch (e) { console.error(e); }
+        };
+
+        const MENSAGENS_FALTA = [
+            "Olá! Notamos que o(a) aluno(a) *{NOME}* faltou hoje à aula. Lembramos que a presença é fundamental para o aprendizado. Favor salvar nosso contato para receber avisos importantes! ✨",
+            "Atenção: O(A) estudante *{NOME}* não compareceu à escola hoje. Caso haja um motivo médico, favor enviar o atestado. Não esqueça de salvar nosso número na sua agenda! 📚",
+            "Prezados pais, informamos que *{NOME}* registrou falta na data de hoje. É muito importante acompanhar a frequência escolar. Por favor, salve nosso contato oficial! ✅",
+            "Sentimos falta do(a) *{NOME}* hoje na escola! O conteúdo de hoje foi muito importante. Se possível, justifique a ausência. Salve este contato para futuras comunicações! 🏫",
+            "Comunicado Escolar: *{NOME}* não esteve presente nas atividades de hoje. Pedimos que priorizem a frequência do aluno. Por favor, salve nosso número nos seus contatos! 📢",
+            "Olá, tudo bem? Notamos a ausência do(a) *{NOME}* hoje. Caso precise de algo, estamos à disposição. Pedimos que salve nosso contato para não perder notificações! 🛡️",
+            "Frequência Escolar: O(A) aluno(a) *{NOME}* faltou hoje. Lembramos que faltas em excesso podem prejudicar a aprovação. Salve nosso contato no seu WhatsApp! ⚠️",
+            "Olá! Passando para informar que *{NOME}* não veio à aula hoje. Esperamos que esteja tudo bem. Salve nosso contato para receber este relatório diariamente! ✨",
+            "Aviso de Ausência: *{NOME}* faltou no dia de hoje. A escola segue à disposição para qualquer dúvida. Importante: salve nosso contato para evitar bloqueios de mensagens! 📲",
+            "Importante: Registramos a falta do(a) estudante *{NOME}* hoje. Contamos com sua parceria para manter a frequência em dia. Por favor, salve nosso contato oficial da escola! 🤝"
+        ];
+
+        window.dispararTurmaMassa = async (sala, idS) => {
+            const dataSelStr = document.getElementById('dataFaltaDia').value;
+            const dataFormatada = new Date(dataSelStr + 'T12:00:00').toLocaleDateString('pt-BR');
+            const dataKey = dataFormatada.replaceAll('/','-');
+
+            const confirm = await Swal.fire({
+                title: `Notificar Turma ${sala}?`,
+                text: "Será enviado uma mensagem aleatória para cada pai de aluno faltoso.",
+                icon: 'question',
+                showCancelButton: true
+            });
+
+            if(!confirm.isConfirmed) return;
+
+            const listaAlunos = [];
+            document.querySelectorAll(`#accF-${idS} tbody tr`).forEach(row => {
+                const nome = row.cells[0].innerText;
+                const tel = row.cells[1].innerText;
+                if(tel && tel !== '---') listaAlunos.push({ nome, tel });
+            });
+
+            if(listaAlunos.length === 0) return Swal.fire("Atenção", "Nenhum aluno com WhatsApp nesta turma.", "warning");
+
+            Swal.fire({ title: 'Enviando...', html: 'Iniciando disparos com intervalo humano...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+            let enviados = 0;
+            for(let item of listaAlunos) {
+                const msg = MENSAGENS_FALTA[Math.floor(Math.random() * MENSAGENS_FALTA.length)].replace("{NOME}", item.nome.toUpperCase());
+                await window.processarZapiAtraso(item.tel, msg);
+                enviados++;
+                const delay = Math.floor(Math.random() * (12000 - 4000 + 1) + 4000); // 4 a 12 seg
+                await new Promise(r => setTimeout(r, delay));
+            }
+
+            const horaEnvio = new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+            const logRef = doc(db, "unidades", logado.escolaId, "log_envio_faltas", dataKey);
+            await setDoc(logRef, { [sala]: horaEnvio }, { merge: true });
+
+            Swal.fire("Sucesso", `${enviados} pais notificados na turma ${sala}.`, "success");
+            window.carregarFaltasDoDia();
+        };
+
+        window.notificarFaltaUnica = async (id, nome, tel) => {
+            if(!tel || tel === '---') return Swal.fire("Atenção", "Sem número de WhatsApp.", "warning");
+            const msg = MENSAGENS_FALTA[Math.floor(Math.random() * MENSAGENS_FALTA.length)].replace("{NOME}", nome.toUpperCase());
+            Swal.fire({title: 'Enviando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+            const ok = await window.processarZapiAtraso(tel, msg);
+            Swal.close();
+            if(ok) Swal.fire("Sucesso", "Notificação enviada!", "success");
+            else Swal.fire("Erro", "Z-API indisponível.", "error");
+        };
+
+        /* --- RESTANTE DO CÓDIGO (ESTUDANTES / RELATÓRIOS / ETC) --- */
+
+        window.abrirModalFalta = (id, nome) => {
+            document.getElementById('falta-alu-id').value = id;
+            document.getElementById('txt-alu-falta-nome').innerText = `Aluno: ${nome}`;
+            document.getElementById('falta-data-ini').valueAsDate = new Date();
+            document.getElementById('falta-data-fim').valueAsDate = new Date();
+            new bootstrap.Modal(document.getElementById('modalJustificarFaltaPeriodo')).show();
+        };
+
+        window.confirmarJustificativaFalta = async () => {
+            const id = document.getElementById('falta-alu-id').value;
+            const dIni = document.getElementById('falta-data-ini').value;
+            const dFim = document.getElementById('falta-data-fim').value;
+            if(!dIni || !dFim) return;
+
+            const start = new Date(dIni + 'T12:00:00');
+            const end = new Date(dFim + 'T12:00:00');
+            const datas = [];
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                datas.push(new Date(d).toLocaleDateString('pt-BR'));
+            }
+
+            try {
+                const ref = doc(db, "alunos", id);
+                const snap = await getDoc(ref);
+                const atuais = snap.data().justificativasFalta || [];
+                const novas = [...new Set([...atuais, ...datas])];
+                await updateDoc(ref, { justificativasFalta: novas });
+                bootstrap.Modal.getInstance(document.getElementById('modalJustificarFaltaPeriodo')).hide();
+                Swal.fire("Abonado!", `${datas.length} dia(s) justificado(s).`, "success");
+                window.carregarFaltasDoDia();
+            } catch (e) {}
+        };
 
         window.alertaCotaAtingida = () => {
             Swal.fire({
@@ -787,36 +1021,26 @@
             window.trocarAba('sec-stats', document.querySelector('.nav-link-pe')); 
         };
 
-        // --- CORREÇÃO DA VERIFICAÇÃO DE COTA ---
         async function verificarCotaDisponivel() {
             try {
                 const escDoc = await getDoc(doc(db, "unidades", logado.escolaId));
-                // Fallback para 600 se não encontrar o documento da unidade
                 const limite = escDoc.exists() ? (escDoc.data().limiteAlunos || 600) : 600;
-                
                 const qAlunos = query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId));
-                
                 let totalAtual = 0;
                 try {
-                    // Tenta contagem otimizada pelo servidor
                     const snapshotContagem = await getCountFromServer(qAlunos);
                     totalAtual = snapshotContagem.data().count;
                 } catch (e) {
-                    // Caso haja erro de permissão na agregação (regras de segurança), conta localmente
                     const snapFallback = await getDocs(qAlunos);
                     totalAtual = snapFallback.size;
                 }
-
                 const badge = document.getElementById('cota-badge');
                 if(badge) badge.innerText = `Cota: ${totalAtual}/${limite}`;
-                
-                // Se o total for 0 mas houver um limite, tratamos como erro de permissão e liberamos o cadastro
                 if (totalAtual === 0 && limite > 0) return { autorizado: true };
-
                 return { autorizado: totalAtual < limite, msg: `Limite atingido.` };
             } catch (e) { 
                 console.error("Erro na contagem:", e);
-                return { autorizado: true }; // Libera por segurança em caso de falha crítica
+                return { autorizado: true }; 
             }
         }
 
@@ -900,6 +1124,7 @@
                 {id:'sec-gestao-face', label:'Biometria', icon:'fa-fingerprint'},
                 {id:'sec-relatorios', label:'Relatórios', icon:'fa-file-invoice'},
                 {id:'sec-faltas', label:'Estudantes', icon:'fa-users'},
+                {id:'sec-faltas-dia', label:'Faltas Diárias', icon:'fa-calendar-times text-danger'},
                 {id:'sec-atrasos', label:'Atrasos Recorrentes', icon:'fa-clock'},
                 {id:'sec-gestao', label:'Minha Assinatura', icon:'fa-gem text-warning'}
             ];
@@ -927,6 +1152,7 @@
             if(btn) btn.classList.add('active');
             if(window.innerWidth <= 992) window.toggleMenu();
             if(id === 'sec-stats') updateCharts();
+            if(id === 'sec-faltas-dia') window.carregarFaltasDoDia();
         };
 
         window.filtrarAlunos = () => {
@@ -1082,7 +1308,18 @@
                     const idT = t.replace(/\s+/g, '-');
                     let linesE = "", cardsB = "";
                     turmas[t].sort((a,b)=>a.nome.localeCompare(b.nome)).forEach(al => {
-                        linesE += `<tr><td class="ps-4 fw-bold small text-uppercase">${al.nome}</td><td class="text-end pe-4"><button class="btn btn-sm btn-light text-primary me-2" onclick="window.abrirEdicao('${al.id}','${al.nome}','${al.sala}','${al.tel}','${al.telefone}')"><i class="fas fa-edit"></i></button><button class="btn btn-sm btn-light text-danger" onclick="window.del('alunos','${al.id}', '${al.nome}')"><i class="fas fa-trash"></i></button></td></tr>`;
+                        const totalAbonos = al.justificativasFalta ? al.justificativasFalta.length : 0;
+                        linesE += `<tr>
+                            <td class="ps-4">
+                                <span class="fw-bold small text-uppercase">${al.nome}</span><br>
+                                <small class="text-muted">Abonos: <b>${totalAbonos}</b></small>
+                            </td>
+                            <td class="text-end pe-4">
+                                <button class="btn btn-sm btn-light text-warning me-2" onclick="window.abrirModalFalta('${al.id}','${al.nome}')" title="Abonar Período"><i class="fas fa-notes-medical"></i></button>
+                                <button class="btn btn-sm btn-light text-primary me-2" onclick="window.abrirEdicao('${al.id}','${al.nome}','${al.sala}','${al.tel}','${al.telefone}')"><i class="fas fa-edit"></i></button>
+                                <button class="btn btn-sm btn-light text-danger" onclick="window.del('alunos','${al.id}', '${al.nome}')"><i class="fas fa-trash"></i></button>
+                            </td>
+                        </tr>`;
                         const tem = !!al.descritor;
                         cardsB += `<div class="col item-face" data-nome="${al.nome.toLowerCase()}"><div class="p-3 bg-white border rounded-4 d-flex justify-content-between align-items-center"><div><span class="fw-bold small">${al.nome}</span><br><small class="${tem?'text-success':'text-danger'} fw-bold">${tem?'ATIVO':'SEM FACE'}</small></div><button class="btn btn-sm ${tem?'btn-outline-primary':'btn-primary'}" onclick="window.abrirCapturaModal('${al.id}','${al.nome}')">VINCULAR</button></div></div>`;
                     });
@@ -1355,7 +1592,7 @@
             let mensagem = "";
             
             if (qtd == 3) {
-                mensagem = `*AcessaEdu | Notificação de Atraso* ⚠️\n\nOlá! Informamos que o(a) aluno(a) *${nome.toUpperCase()}* chegou após às 07:45 na escola nos dias: ${datas}.\n\nAtrasos recorंतिकas prejudicam o estudante. Se chegar a 6 atrasos, os responsáveis serão convocados. ✨`;
+                mensagem = `*AcessaEdu | Notificação de Atraso* ⚠️\n\nOlá! Informamos que o(a) aluno(a) *${nome.toUpperCase()}* chegou após às 07:45 na escola nos dias: ${datas}.\n\nAtrasos recorrentes prejudicam o estudante. Se chegar a 6 atrasos, os responsáveis serão convocados. ✨`;
             } else if (qtd == 6) {
                 mensagem = `*AcessaEdu | Convocação de Responsáveis* 🚨\n\nOlá! Informamos que o(a) aluno(a) *${nome.toUpperCase()}* atingiu 6 atrasos.\n\nÉ necessária a presença dos responsáveis na escola no dia *${dataR}* às *${horaR}* para reunião. ✨`;
             } else if (qtd == 9) {
@@ -1405,7 +1642,6 @@
                 
                 const alunosSnap = await getDocs(query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId)));
                 const freqSnap = await getDocs(query(collection(db, "frequencia"), where("escolaId", "==", logado.escolaId)));
-                const hoje = new Date().toLocaleDateString('pt-BR');
                 
                 const mapaFreq = {};
                 freqSnap.forEach(d => {

@@ -22,9 +22,11 @@
         @keyframes scanning { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
         .feedback-area { margin-top: 20px; min-height: 120px; }
         .card-aluno { background: var(--pe-green); color: white; padding: 15px; border-radius: 20px; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .card-atraso { background: var(--pe-yellow); color: var(--pe-blue); padding: 15px; border-radius: 20px; animation: popIn 0.5s ease; }
         .card-bloqueio { background: var(--pe-red); color: white; padding: 15px; border-radius: 20px; animation: shake 0.5s ease-in-out; }
         .btn-voltar { position: fixed; top: 20px; left: 20px; background: rgba(255,255,255,0.2); color: white; border-radius: 30px; padding: 8px 20px; text-decoration: none; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.3); z-index: 100; }
-        @keyframes popIn { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; scale(1); } }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
     </style>
 </head>
 <body>
@@ -126,79 +128,78 @@
         }
 
         async function processarPresenca(nome, info) {
-            const hoje = new Date().toLocaleDateString('pt-BR');
-            const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            const agora = new Date();
+            const hoje = agora.toLocaleDateString('pt-BR');
+            const horaAtual = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            
+            // Lógica de Atraso: 07:46 (466 minutos desde 00:00)
+            const [h, m] = horaAtual.split(':').map(Number);
+            const totalMinutos = (h * 60) + m;
+            const estaAtrasado = totalMinutos >= 466;
+
             const q = query(collection(db, "frequencia"), where("nome", "==", nome), where("data", "==", hoje), where("escolaId", "==", logado.escolaId));
             const snap = await getDocs(q);
+
             if (!snap.empty) {
                 document.getElementById('display').innerHTML = `<div class="card-bloqueio"><h2>JÁ REGISTRADO</h2><p>${nome.toUpperCase()}</p></div>`;
             } else {
-                document.getElementById('display').innerHTML = `<div class="card-aluno"><h2>BEM-VINDO(A)</h2><p>${nome.toUpperCase()}</p></div>`;
-                await addDoc(collection(db, "frequencia"), { nome, sala: info.sala, escolaId: logado.escolaId, data: hoje, hora, dataHora: serverTimestamp() });
-                if (configEscola.mensagensAtivas && info.telResp) {
-                    enviarZapiImediato(info.telResp, nome, hora);
+                // Registrar no Banco de Dados
+                await addDoc(collection(db, "frequencia"), { 
+                    nome, 
+                    sala: info.sala, 
+                    escolaId: logado.escolaId, 
+                    data: hoje, 
+                    hora: horaAtual, 
+                    dataHora: serverTimestamp(),
+                    atraso: estaAtrasado 
+                });
+
+                if (estaAtrasado) {
+                    document.getElementById('display').innerHTML = `<div class="card-atraso"><h2>ENTRADA COM ATRASO</h2><p>${nome.toUpperCase()}<br>Horário: ${horaAtual}</p></div>`;
+                    // Só envia WhatsApp se for ATRASO
+                    if (configEscola.mensagensAtivas && info.telResp) {
+                        enviarZapiAtraso(info.telResp, nome, horaAtual);
+                    }
+                } else {
+                    document.getElementById('display').innerHTML = `<div class="card-aluno"><h2>BEM-VINDO(A)</h2><p>${nome.toUpperCase()}</p></div>`;
+                    // Presença normal: NÃO envia mensagem (Silencioso)
                 }
             }
-            ultimoNomeDetectado = nome; tempoUltimaDeteccao = Date.now();
+            ultimoNomeDetectado = nome; 
+            tempoUltimaDeteccao = Date.now();
             setTimeout(resetDisplay, 3000);
         }
 
-        async function enviarZapiImediato(telefone, alunoNome, hora) {
+        async function enviarZapiAtraso(telefone, alunoNome, hora) {
             if (!configEscola.zapiApi || !configEscola.zapiInstance) return;
 
-            // --- VARIÁVEIS PARA AS MENSAGENS ---
             const nomeU = alunoNome.toUpperCase();
             const escolaU = configEscola.nome.toUpperCase();
             const dataH = new Date().toLocaleDateString('pt-BR');
             const hash = Math.random().toString(36).substring(7).toUpperCase();
 
-            // --- LISTAS PARA ALEATORIEDADE (SPINTAX) ---
-            const saudações = ["Olá!", "Bom dia!", "Tudo bem?", "Oi!", "Olá, tudo certo?", "Saudações!", "Atenção Responsáveis:"];
-            const corpos = [
-                `registro de presença realizado para *${nomeU}* na escola *${escolaU}*.`,
-                `informamos que o(a) aluno(a) *${nomeU}* já está na instituição *${escolaU}*.`,
-                `confirmamos que *${nomeU}* registrou entrada na unidade *${escolaU}*.`,
-                `notificamos a chegada de *${nomeU}* para as atividades na escola *${escolaU}*.`,
-                `comunicamos que o(a) estudante *${nomeU}* iniciou o período letivo em *${escolaU}*.`
-            ];
-            const interacoes = [
-                "Por favor, responda com um *'OK'*.",
-                "Pode nos dar um retorno com um *'SIM'* por favor?",
-                "Responda com um *'OK'* para confirmarmos o recebimento.",
-                "Tudo certo com o horário? Responda com um *'OK'*.",
-                "Poderia nos confirmar o recebimento com um *'RECEBIDO'*?",
-                "Dê um retorno com *'TUDO CERTO'* para validação do sistema."
-            ];
-            const rodapes = [
-                "🤝 Escola e família conectadas.",
-                "📌 Salve nosso número oficial na sua agenda.",
-                "💡 Adicione este contato para evitar que as mensagens caiam no spam.",
-                "✅ Notificação automática gerada pelo sistema AcessaEdu.",
-                "🏫 Segurança e controle escolar avançando sempre com você."
+            // --- 5 VARIAÇÕES DE MENSAGENS DE ATRASO ---
+            const mensagens = [
+                `*AcessaEdu | Alerta de Atraso* ⚠️\n\nInformamos que o(a) aluno(a) *${nomeU}* chegou à escola *${escolaU}* com atraso, às *${hora}*.\n\nLembramos que a pontualidade é fundamental. O acúmulo de 6 atrasos ou 3 faltas sem justificativa resultará em convocação presencial dos responsáveis.`,
+                
+                `*AcessaEdu | Notificação Escolar* ⌚\n\nRegistramos a entrada tardia de *${nomeU}* às *${hora}* na instituição *${escolaU}*.\n\nPedimos colaboração com o horário letivo. Conforme o regimento, ao atingir 6 atrasos, o responsável deverá comparecer à escola para reunião.`,
+                
+                `*AcessaEdu | Controle de Acesso* 🔔\n\nAtenção: O(a) estudante *${nomeU}* registrou entrada após o horário limite (07:45), marcando presença às *${hora}*.\n\nAcompanhe a frequência do aluno. Evite a suspensão de atividades por excesso de atrasos (Limite: 6 por trimestre).`,
+                
+                `*AcessaEdu | Informativo* 🚩\n\nComunicamos que *${nomeU}* iniciou suas atividades escolares hoje com atraso (*${hora}*).\n\nReforce com o aluno a importância de chegar antes das 07:45. Faltas acumuladas (3) ou Atrasos (6) geram chamado da diretoria.`,
+                
+                `*AcessaEdu | Aviso Importante* 🏫\n\nIdentificamos atraso no registro de entrada de *${nomeU}* às *${hora}* na escola *${escolaU}*.\n\nPara segurança e organização pedagógica, solicitamos atenção aos horários. O descumprimento recorrente exigirá a presença do responsável na unidade.`
             ];
 
-            // --- ESCOLHA ALEATÓRIA ---
-            const s = saudações[Math.floor(Math.random() * saudações.length)];
-            const c = corpos[Math.floor(Math.random() * corpos.length)];
-            const i = interacoes[Math.floor(Math.random() * interacoes.length)];
-            const r = rodapes[Math.floor(Math.random() * rodapes.length)];
+            const msgFinal = mensagens[Math.floor(Math.random() * mensagens.length)] + `\n\n_Ref: ${hash}_`;
 
-            // --- MONTAGEM DA MENSAGEM FINAL ---
-            const msgFinal = `*AcessaEdu | Notificação* 🏫\n\n` +
-                             `${s} ${c}\n\n` +
-                             `📅 Data: ${dataH}\n` +
-                             `⏰ Hora: ${hora}\n\n` +
-                             `${i}\n\n` +
-                             `${r}\n` +
-                             `_Reg: ${hash}_`;
-
-            // --- TRATAMENTO DO NÚMERO ---
+            // Tratamento do número
             let num = "55" + telefone.replace(/\D/g, '').replace(/^55/, '');
             if (num.length === 13) num = num.substring(0, 4) + num.substring(5);
 
-            // --- 15 TEMPOS ALEATÓRIOS (DELAY E TYPING) ---
-            const dZ = [6, 12, 18, 25, 8, 14, 20, 7, 28, 32, 5, 15, 23, 11, 19];
-            const tZ = [3, 5, 7, 4, 6, 3, 8, 5, 4, 6, 3, 7, 5, 4, 6];
+            // Delays aleatórios para proteção
+            const dZ = [8, 15, 22, 10, 18];
+            const tZ = [4, 6, 3, 5, 4];
             const randomDelay = dZ[Math.floor(Math.random() * dZ.length)];
             const randomTyping = tZ[Math.floor(Math.random() * tZ.length)];
 
@@ -208,7 +209,6 @@
                 const headers = { 'Content-Type': 'application/json' };
                 if (configEscola.zapiSecurity) headers['Client-Token'] = configEscola.zapiSecurity;
 
-                // DISPARA PARA A Z-API
                 fetch(endpoint, { 
                     method: 'POST', 
                     headers: headers, 
@@ -219,7 +219,7 @@
                         delayTyping: randomTyping 
                     }) 
                 });
-            } catch (e) { console.error("Erro no disparo Z-API:", e); }
+            } catch (e) { console.error("Erro Z-API Atraso:", e); }
         }
 
         function resetDisplay() {
