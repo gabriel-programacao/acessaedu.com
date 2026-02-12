@@ -167,49 +167,34 @@
             const dataHoje = new Date().toLocaleDateString('pt-BR');
             const registroId = Math.random().toString(36).substring(7).toUpperCase();
 
-            // 1. SAUDAÇÕES ALEATÓRIAS (10 OPÇÕES)
-            const saudacoes = ["Olá, bom dia!", "Notificação Escolar - AcessaEdu:", "Atenção, informativo escolar:", "Olá, tudo bem?", "Comunicado Importante:", "Aviso AcessaEdu:", "Saudações escolares!", "Bom dia, família!", "Olá! Notificamos que:", "Mensagem Automática:"];
+            // --- 10 SAUDAÇÕES ---
+            const saudacoes = ["*AcessaEdu | Notificação de Entrada*", "*Informativo Escolar Importante*", "*Comunicado de Frequência*", "Prezados Pais e Responsáveis,", "Olá! Notificamos que:", "*Alerta de Atraso Escolar*", "Saudações da coordenação escolar.", "Atenção: Registro de Entrada Tardia", "*AcessaEdu | Controle de Acesso*", "Aviso de Horário Escolar:"];
 
-            // 2. CORPO DA MENSAGEM BEM ESTRUTURADO (10 OPÇÕES)
+            // --- 10 CORPOS COM ÊNFASE NA DATA/HORA ---
             const corpos = [
-                `*AcessaEdu | Notificação* 🏫\n\nSaudações! Notificamos o *ATRASO* de *${nomeU}* para as atividades na escola *${escolaU}*.`,
-                `*AcessaEdu | Informativo* 🔔\n\nAtenção! Registramos entrada tardia do(a) aluno(a) *${nomeU}* na instituição *${escolaU}*.`,
-                `*Controle Escolar | AcessaEdu* 🚩\n\nComunicamos aos responsáveis que o(a) estudante *${nomeU}* registrou entrada com atraso hoje na unidade *${escolaU}*.`,
-                `*AcessaEdu | Alerta de Frequência* ⌚\n\nPrezados pais, informamos que *${nomeU}* iniciou as atividades hoje após o horário permitido em *${escolaU}*.`,
-                `*AcessaEdu | Aviso Importante* 🏫\n\nNotificamos que o registro de entrada de *${nomeU}* consta como *ATRASO* no sistema da escola *${escolaU}*.`,
-                `*Notificação de Acesso | AcessaEdu* 🔔\n\nIdentificamos que *${nomeU}* deu entrada na unidade *${escolaU}* fora do horário padrão.`,
-                `*AcessaEdu | Gestão Escolar* 🚩\n\nInformamos aos responsáveis sobre o atraso escolar de *${nomeU}* na unidade *${escolaU}* no dia de hoje.`,
-                `*Aviso de Entrada | AcessaEdu* 🏫\n\nSaudações! O sistema registrou a entrada de *${nomeU}* em *${escolaU}*, o que configura atraso.`,
-                `*AcessaEdu | Atenção Responsáveis* 🔔\n\nO(a) aluno(a) *${nomeU}* acabou de registrar entrada com atraso na escola *${escolaU}*.`,
-                `*Comunicado de Atraso | AcessaEdu* 🚩\n\nNotificamos entrada tardia registrada para *${nomeU}* na escola *${escolaU}* na data de hoje.`
+                `Informamos que o(a) aluno(a) *${nomeU}* registrou sua entrada na unidade *${escolaU}* APÓS o horário permitido para o início das atividades escolares.\n\n📅 Data: ${dataHoje}\n⏰ Horário de Chegada: ${hora}`,
+                `Identificamos através do nosso sistema que *${nomeU}* chegou à escola hoje fora do horário estabelecido. Ressaltamos que a entrada ocorreu depois do limite de tolerância.\n\n📅 Registro em: ${dataHoje}\n⌚ Hora da entrada: ${hora}`,
+                `Notificamos que, na data de hoje, o(a) estudante *${nomeU}* acessou as dependências da instituição apresentando atraso no cumprimento do horário escolar.\n\n📅 Data do evento: ${dataHoje}\n⏰ Hora registrada: ${hora}`,
+                `Atenção: O sistema AcessaEdu acaba de detectar que *${nomeU}* ultrapassou o horário limite de entrada permitido para o bom andamento das aulas.\n\n📅 Data: ${dataHoje}\n⏰ Hora exata: ${hora}`,
+                `Informamos aos responsáveis que o registro de frequência de *${nomeU}* consta como tardio, tendo o(a) aluno(a) se apresentado após o sinal de início.\n\n📅 Data: ${dataHoje}\n⌚ Horário de chegada: ${hora}`,
+                `O(a) aluno(a) *${nomeU}* registrou entrada na escola *${escolaU}* com atraso verificado. É fundamental que o horário letivo seja respeitado para evitar prejuízos.\n\n📅 Data: ${dataHoje}\n⏰ Entrada às: ${hora}`,
+                `Comunicamos que, infelizmente, *${nomeU}* não conseguiu cumprir o horário regulamentar da unidade hoje, chegando após o início das aulas.\n\n📅 Data: ${dataHoje}\n⏰ Horário: ${hora}`,
+                `Este é um aviso automático para informar que *${nomeU}* deu entrada na instituição fora do período de pontualidade esperado pela equipe diretiva.\n\n📅 Dia: ${dataHoje}\n⌚ Horário de acesso: ${hora}`,
+                `Registramos que o(a) estudante *${nomeU}* apresentou-se para as atividades letivas hoje com atraso, marcando sua entrada no sistema após o horário oficial.\n\n📅 Data: ${dataHoje}\n⏰ Hora: ${hora}`,
+                `Saudações. Notificamos que o(a) aluno(a) *${nomeU}* chegou à unidade *${escolaU}* em um horário posterior ao permitido para o acesso pontual.\n\n📅 Data: ${dataHoje}\n⏰ Horário registrado: ${hora}`
             ];
 
-            // 3. INTERAÇÕES PARA OS PAIS (10 OPÇÕES)
-            const interacoes = [
-                "Por favor, responda com *'OK'* se visualizou este aviso.",
-                "Responda com *'RECEBIDO'* para confirmarmos sua leitura.",
-                "Poderia nos confirmar o recebimento desta mensagem? Basta digitar *'OK'*.",
-                "Pedimos que responda com *'CIENTE'* para controle interno da escola.",
-                "Confirme que leu esta mensagem respondendo apenas *'OK'*.",
-                "Poderia escrever *'VISUALIZADO'* para que possamos validar o envio?",
-                "Sua confirmação é importante. Responda com *'SIM'* se recebeu este alerta.",
-                "Por gentileza, digite *'CONFIRMADO'* para acusar o recebimento.",
-                "Responda esta mensagem com *'OK'* para segurança do processo.",
-                "Para validar este comunicado, responda com *'CIENTE'*."
-            ];
+            // --- 10 INTERAÇÕES ---
+            const fechamentos = ["Por favor, responda com *'OK'* se visualizou este informativo.", "Solicitamos que responda com *'CIENTE'* para validarmos a notificação.", "Pedimos que, por gentileza, responda com *'RECEBIDO'* para nosso controle.", "Se você visualizou este aviso, poderia confirmar escrevendo apenas *'OK'*?", "Sua confirmação é essencial para mantermos o registro. Responda com *'SIM'*.", "Pode confirmar o recebimento deste comunicado digitando *'OK'*?", "Contamos com sua colaboração para evitar atrasos rotineiros. Responda com *'OK'*.", "Responda a este alerta com *'CIENTE'* para que possamos registrar sua visualização.", "A parceria entre família e escola é vital. Por favor, responda com *'OK'*.", "Para validar este envio automático, pedimos que responda com *'RECEBIDO'*."];
 
-            // SORTEIO ALEATÓRIO
             const s = saudacoes[Math.floor(Math.random() * saudacoes.length)];
             const c = corpos[Math.floor(Math.random() * corpos.length)];
-            const i = interacoes[Math.floor(Math.random() * interacoes.length)];
+            const f = fechamentos[Math.floor(Math.random() * fechamentos.length)];
             
-            // MONTAGEM FINAL COM ESTRUTURA E LEMA
-            const msgFinal = `${s}\n\n${c}\n\n📅 Data: ${dataHoje}\n⏰ Hora: ${hora}\n\n${i}\n\nInformamos que se chegarmos a 3 atrasos como este, teremos que convocá-los à escola.\n\n*${escolaU}* sempre avançando, sempre junto!\n_Busca ativa junto da família._\n\n✅ Notificação automática AcessaEdu.\n_Cod: ${registroId}_`;
+            const msgFinal = `${s}\n\n${c}\n\n${f}\n\n*${escolaU}* sempre avançando, sempre junto!\n_Busca ativa junto da família._\n\n✅ Notificação AcessaEdu\n_Ref: ${registroId}_`;
 
-            // 15 TEMPOS DE ESPERA (DELAY)
-            const temposAleatorios = [5, 8, 12, 15, 18, 22, 25, 30, 35, 40, 45, 50, 55, 60, 65];
+            const temposAleatorios = [5, 10, 15, 20, 21, 30, 35, 40, 43, 50, 55, 64, 78, 80, 92, 13, 12, 4, 46, 39, ];
             const delayEscolhido = temposAleatorios[Math.floor(Math.random() * temposAleatorios.length)];
-            const tempoDigitando = Math.floor(Math.random() * 4) + 2; 
 
             let num = "55" + telefone.replace(/\D/g, '').replace(/^55/, '');
             if (num.length === 13) num = num.substring(0, 4) + num.substring(5);
@@ -223,10 +208,9 @@
                 fetch(endpoint, { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json', ...(configEscola.zapiSecurity && { 'Client-Token': configEscola.zapiSecurity }) }, 
-                    body: JSON.stringify({ phone: num, message: msgFinal, delayMessage: delayEscolhido, delayTyping: tempoDigitando }) 
+                    body: JSON.stringify({ phone: num, message: msgFinal, delayMessage: delayEscolhido, delayTyping: 4 }) 
                 }).then(r => console.log(`Envio: ${registroId} | Status: ${r.status} | Delay: ${delayEscolhido}s`));
-
-            } catch (e) { console.error("Erro Z-API Atraso:", e); }
+            } catch (e) { console.error("Erro Z-API:", e); }
         }
 
         function resetDisplay() {

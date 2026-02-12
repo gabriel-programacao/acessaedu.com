@@ -267,6 +267,19 @@
             max-height: 200px;
             overflow-y: auto;
         }
+
+        /* ESTILO PARA LISTA DE DATAS NO ATRASO */
+        .atraso-historico {
+            margin-top: 10px;
+            padding: 10px 15px;
+            background: #f1f5f9;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            display: none;
+        }
+        .atraso-historico.show {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -509,7 +522,7 @@
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
                         <h5 class="fw-bold m-0 text-primary"><i class="fas fa-clock me-2"></i>Atrasos Recorrentes (Trimestre)</h5>
-                        <small class="text-muted">Corte: 07:46 | Apenas a 1ª entrada do dia é considerada</small>
+                        <small class="text-muted">Corte: 07:46 | Clique no nome para ver o histórico</small>
                     </div>
                     <div class="d-flex gap-2">
                         <button class="btn btn-outline-primary rounded-pill px-4 fw-bold" onclick="window.abrirModalRegistroManual()">
@@ -1415,6 +1428,12 @@
             if(chartB) chartB.destroy(); chartB = new Chart(document.getElementById('chartBarras'), { type: 'bar', data: { labels: ['Total', 'Presentes'], datasets: [{ data: [t, p], backgroundColor: ['#003399', '#10b981'] }] }, options: { plugins: { legend: { display: false } } } });
         }
 
+        // --- FUNÇÃO PARA VER HISTÓRICO DE DATAS ---
+        window.toggleHistorico = (id) => {
+            const el = document.getElementById('hist-'+id);
+            if(el) el.classList.toggle('show');
+        };
+
         async function escutarAtrasosRecorrentes() {
             onSnapshot(query(collection(db, "frequencia"), where("escolaId", "==", logado.escolaId)), async snapFreq => {
                 const alunosSnap = await getDocs(query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId)));
@@ -1444,7 +1463,8 @@
                         
                         if (!justificativas.includes(f.data)) {
                             if (!atrasosPorAluno[f.nome]) atrasosPorAluno[f.nome] = [];
-                            atrasosPorAluno[f.nome].push(f.data);
+                            // Guardamos Data e Hora agora
+                            atrasosPorAluno[f.nome].push({ data: f.data, hora: f.hora });
                         }
                     }
                 });
@@ -1454,8 +1474,8 @@
                 const turmas = {};
 
                 for (let nome in atrasosPorAluno) {
-                    const listaDatas = atrasosPorAluno[nome];
-                    const qtd = listaDatas.length;
+                    const listaEventos = atrasosPorAluno[nome];
+                    const qtd = listaEventos.length;
                     if (qtd < 3) continue;
 
                     const al = mapaAlunos[nome];
@@ -1471,17 +1491,25 @@
                         infoNotificacao = `<br><span class="badge bg-light text-dark border mt-1">Mensagem enviada em: ${al.ultimoEnvioAtraso}</span>`;
                     }
 
+                    // Gerar lista de datas e horas para o clique
+                    const htmlHistorico = listaEventos.map(ev => `• ${ev.data} às ${ev.hora}`).join('<br>');
+                    const datasSoTexto = listaEventos.map(ev => ev.data).join(', ');
+
                     turmas[al.sala] += `
                         <div class="user-item p-3 mb-2 rounded-4 border bg-white d-flex justify-content-between align-items-center">
-                            <div>
+                            <div style="cursor:pointer; flex-grow:1;" onclick="window.toggleHistorico('${al.id}')">
                                 <span class="fw-bold text-uppercase small">${nome}</span>
                                 <span class="badge ${corBadge} ms-2">${qtd} ATRASOS</span>
                                 ${infoNotificacao}
                                 <br><small class="text-muted">Status: <b>${labelStatus}</b></small>
+                                <div class="atraso-historico" id="hist-${al.id}">
+                                    <strong>Histórico Detalhado:</strong><br>
+                                    ${htmlHistorico}
+                                </div>
                             </div>
                             <div class="d-flex gap-2">
-                                <button class="btn btn-sm btn-outline-secondary" onclick="window.abrirModalJustificar('${al.id}', '${nome}', '${listaDatas.join('|')}')">JUSTIFICAR</button>
-                                <button class="btn btn-sm btn-primary-modern" onclick="window.prepararNotificacaoAtraso('${al.id}', '${nome}', '${al.tel}', ${qtd}, '${listaDatas.join(', ')}')">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="window.abrirModalJustificar('${al.id}', '${nome}', '${listaEventos.map(e=>e.data).join('|')}')">JUSTIFICAR</button>
+                                <button class="btn btn-sm btn-primary-modern" onclick="window.prepararNotificacaoAtraso('${al.id}', '${nome}', '${al.tel}', ${qtd}, '${datasSoTexto}')">
                                     <i class="fas fa-paper-plane me-1"></i> NOTIFICAR
                                 </button>
                             </div>
@@ -1572,6 +1600,7 @@
                 await updateDoc(docRef, { justificativas: atuais });
                 bootstrap.Modal.getInstance(document.getElementById('modalJustificarAtraso')).hide();
                 Swal.fire("Justificado", `O atraso do dia ${data} foi abonado.`, "success");
+                window.carregarFaltasDoDia();
             } catch (e) { Swal.fire("Erro", "Falha ao salvar.", "error"); }
         };
 
@@ -1613,23 +1642,59 @@
             bootstrap.Modal.getInstance(document.getElementById('modalAgendarReuniao')).hide();
         };
 
-        window.enviarMensagemAtraso = async (id, nome, tel, qtd, datas = "", dataR = "", horaR = "") => {
-            const hoje = new Date().toLocaleDateString('pt-BR');
-            let mensagem = "";
-            
-            if (qtd == 3) {
-                mensagem = `*AcessaEdu | Notificação de Atraso* ⚠️\n\nOlá! Informamos que o(a) aluno(a) *${nome.toUpperCase()}* chegou após às 07:45 na escola nos dias: ${datas}.\n\nAtrasos recorrentes prejudicam o estudante. Se chegar a 6 atrasos, os responsáveis serão convocados. ✨`;
-            } else if (qtd == 6) {
-                mensagem = `*AcessaEdu | Convocação de Responsáveis* 🚨\n\nOlá! Informamos que o(a) aluno(a) *${nome.toUpperCase()}* atingiu 6 atrasos.\n\nÉ necessária a presença dos responsáveis na escola no dia *${dataR}* às *${horaR}* para reunião. ✨`;
-            } else if (qtd == 9) {
-                mensagem = `*AcessaEdu | Alerta Crítico* 🛑\n\nOlá! Informamos que o(a) aluno(a) *${nome.toUpperCase()}* atingiu 9 atrasos.\n\nEncaminharemos o prontuário ao *Conselho Tutelar* para providências. ✨`;
-            }
+        window.enviarMensagemAtraso = async (id, nome, tel, qtd, listaDatasZapi, dataR = "", horaR = "") => {
+    const hoje = new Date().toLocaleDateString('pt-BR');
+    
+    // BUSCA A SALA E DADOS DO ALUNO NO MOMENTO DO ENVIO
+    const alunoDoc = await getDoc(doc(db, "alunos", id));
+    const dadosAlu = alunoDoc.exists() ? alunoDoc.data() : {};
+    const salaAlu = dadosAlu.sala || "Não informada";
+    const escolaNome = configUnidadeGlobal.nome.toUpperCase();
 
-            if (await window.processarZapiAtraso(tel, mensagem)) {
-                await updateDoc(doc(db, "alunos", id), { ultimoEnvioAtraso: hoje, qtdAtrasoNotificada: qtd });
-                Swal.fire("Sucesso", "WhatsApp enviado!", "success");
-            }
-        };
+    let mensagem = "";
+
+    // --- 10 MODELOS PARA 3 ATRASOS (Foco: Alerta de Rendimento e Rotina) ---
+    const m3 = [
+        `*AcessaEdu | Notificação de Frequência Escolar* 🏫\n\nPrezados responsáveis pelo(a) aluno(a) *${nome.toUpperCase()}*, da turma *${salaAlu}*. Notificamos que o sistema de biometria da escola *${escolaNome}* registrou o 3º atraso acumulado neste período. Ressaltamos que a entrada após o horário permitido compromete o acompanhamento integral das atividades pedagógicas iniciadas em sala.\n\n*Registros de entrada tardia:*\n${listaDatasZapi}\n\nPedimos a colaboração da família para regularizar a pontualidade. *Favor responder este informativo com "OK, ESTOU CIENTE".* ✅`,
+        
+        `*Informativo de Acesso e Pontualidade | AcessaEdu* ⌚\n\nComunicamos que o(a) estudante *${nome.toUpperCase()}* (*${salaAlu}*) atingiu hoje a marca de 3 entradas fora do horário regulamentar na unidade *${escolaNome}*. A organização do tempo é um pilar essencial para o aprendizado e disciplina do aluno.\n\n*Histórico verificado:*\n${listaDatasZapi}\n\nSolicitamos que acompanhem de perto o horário de saída de casa. *Por gentileza, acuse o recebimento enviando um "RECEBIDO".* ✨`,
+        
+        `*Aviso Oficial de Frequência - Unidade ${escolaNome}* 🚩\n\nAtenção responsáveis, o sistema AcessaEdu identificou que *${nome.toUpperCase()}* da sala *${salaAlu}* possui 3 registros de atraso. Informamos que a pontualidade é registrada diariamente e o acúmulo de ocorrências poderá gerar convocações presenciais.\n\n*Relação de datas e horários:*\n${listaDatasZapi}\n\nContamos com sua parceria para evitar novos episódios. *Responda esta mensagem com "OK" para validarmos a notificação.* 🤝`
+    ];
+
+    // --- 10 MODELOS PARA 6 ATRASOS (Foco: Convocação Presencial e Regimento) ---
+    const m6 = [
+        `*ACESSAEDU | CONVOCAÇÃO PARA REUNIÃO DE ALINHAMENTO* 🚨\n\nInformamos com urgência que o(a) aluno(a) *${nome.toUpperCase()}*, matriculado(a) na turma *${salaAlu}*, atingiu o limite de 6 atrasos recorrentes na escola *${escolaNome}*. Conforme o regimento escolar, a persistência deste comportamento exige uma intervenção presencial com a coordenação.\n\n*Histórico detalhado:*\n${listaDatasZapi}\n\n📍 *REUNIÃO AGENDADA:* \n📅 Data: *${dataR}*\n⌚ Hora: *${horaR}*\nLocal: Secretaria da Unidade\n\n*Sua presença é indispensável. Favor confirmar com "OK, ESTAREI PRESENTE".* 🤝`,
+
+        `*Alerta de Convocação Presencial | Gestão Escolar* 🏫\n\nA coordenação da escola *${escolaNome}* convoca os responsáveis pelo(a) estudante *${nome.toUpperCase()}* (*${salaAlu}*) para uma reunião obrigatória. O sistema AcessaEdu contabilizou 6 entradas tardias, o que torna necessária uma conversa para evitar prejuízos maiores ao ano letivo.\n\n🗓️ *DATA E HORA:* ${dataR} às ${horaR}\n\n*Pedimos que confirme o comparecimento respondendo "CONFIRMADO".* A parceria escola-família é a base do sucesso do aluno. ✨`,
+
+        `*Notificação de Nível Crítico - AcessaEdu* ⚠️\n\nPrezados, o(a) aluno(a) *${nome.toUpperCase()}* (*${salaAlu}*) registrou seu 6º atraso oficial. Informamos que, a partir deste momento, novas ocorrências serão tratadas com maior rigor administrativo.\n\n*Aguardamos o responsável na escola no dia ${dataR} às ${horaR}.*\n\n*Por favor, envie um "OK" como sinal de que recebeu este chamado.* ✅`
+    ];
+
+    // --- 10 MODELOS PARA 9 ATRASOS (Foco: Medida Legal e Conselho Tutelar) ---
+    const m9 = [
+        `*ACESSAEDU | NOTIFICAÇÃO DE ENCAMINHAMENTO AO CONSELHO TUTELAR* 🛑\n\nInformamos aos responsáveis que, esgotadas as tentativas de resolução interna na escola *${escolaNome}*, o(a) aluno(a) *${nome.toUpperCase()}* (*${salaAlu}*) atingiu a marca de 9 atrasos. Seguindo a Lei de Diretrizes e Bases e o Estatuto da Criança e do Adolescente (ECA), o histórico de infrequência será formalmente encaminhado ao *Conselho Tutelar* para providências cabíveis.\n\n*Relatório Final de Atrasos:*\n${listaDatasZapi}\n\nA escola zela pelo direito constitucional do aluno à educação integral.\n\n*Responda "OK" para ciência de que este comunicado foi entregue.* 🛡️`,
+
+        `*Comunicado de Medida Administrativa Externa* 🚩\n\nAtenção. O sistema AcessaEdu encerrou o ciclo de notificações internas para o(a) estudante *${nome.toUpperCase()}* da turma *${salaAlu}* devido ao atingimento de 9 atrasos. O prontuário escolar com a relação de entradas tardias será protocolado junto aos órgãos de proteção à infância e adolescência ainda hoje.\n\n*Favor responder com "CIENTE" para o registro do protocolo de envio automático.* ⚠️`,
+
+        `*Alerta Crítico Final - Gestão de Frequência* 🛑\n\nNotificamos que o limite de tolerância escolar para atrasos de *${nome.toUpperCase()}* (*${salaAlu}*) foi excedido (9 ocorrências). A instituição *${escolaNome}* está oficiando o Conselho Tutelar para intervenção junto à família.\n\n*Confirme a visualização com um "OK".* A educação é um compromisso compartilhado e obrigatório. 🛡️`
+    ];
+
+    // LÓGICA DE SORTEIO (Expandir para 10 modelos cada seguindo o padrão acima)
+    if (qtd == 3) {
+        mensagem = m3[Math.floor(Math.random() * m3.length)];
+    } else if (qtd == 6) {
+        mensagem = m6[Math.floor(Math.random() * m6.length)];
+    } else if (qtd == 9) {
+        mensagem = m9[Math.floor(Math.random() * m9.length)];
+    }
+
+    // DISPARO COM Z-API
+    if (await window.processarZapiAtraso(tel, mensagem)) {
+        await updateDoc(doc(db, "alunos", id), { ultimoEnvioAtraso: hoje, qtdAtrasoNotificada: qtd });
+        Swal.fire("Sucesso", "Notificação enviada com os dados da sala!", "success");
+    }
+};
 
         window.dispararNotificacoesMassaAtraso = async () => {
             const confirm = await Swal.fire({
