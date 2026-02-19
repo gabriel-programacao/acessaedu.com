@@ -824,6 +824,7 @@
             window.carregarFaltasDoDia();
         }
 
+        /* --- LÓGICA DE FALTAS DO DIA CORRIGIDA --- */
         window.carregarFaltasDoDia = async () => {
             const dataSelStr = document.getElementById('dataFaltaDia').value;
             if(!dataSelStr) return;
@@ -849,9 +850,9 @@
                     const al = docAlu.data();
                     const justificativas = al.justificativasFalta || [];
                     
-                    if(!nomesPresentes.has(alu.nome) && !justificativas.includes(dataFormatada)) {
-                        if(!turmas[alu.sala]) turmas[alu.sala] = [];
-                        turmas[alu.sala].push({ id: docAlu.id, ...alu });
+                    if(!nomesPresentes.has(al.nome) && !justificativas.includes(dataFormatada)) {
+                        if(!turmas[al.sala]) turmas[al.sala] = [];
+                        turmas[al.sala].push({ id: docAlu.id, ...al });
                     }
                 });
 
@@ -870,14 +871,14 @@
                     const textoBotao = jaEnviado ? `<i class="fas fa-check-circle"></i> ENVIADO AS ${jaEnviado}` : `<i class="fas fa-paper-plane"></i> NOTIFICAR TURMA`;
 
                     let rows = "";
-                    turmas[sala].forEach(al => {
+                    turmas[sala].forEach(alData => {
                         rows += `
                         <tr>
-                            <td class="ps-4 fw-bold small text-uppercase">${al.nome}</td>
-                            <td>${al.tel || '---'}</td>
+                            <td class="ps-4 fw-bold small text-uppercase">${alData.nome}</td>
+                            <td>${alData.tel || '---'}</td>
                             <td class="text-end pe-4">
-                                <button class="btn btn-sm btn-light text-warning me-2" onclick="window.abrirModalFalta('${al.id}','${al.nome}')" title="Abonar Período"><i class="fas fa-notes-medical"></i></button>
-                                <button class="btn btn-sm btn-outline-danger" onclick="window.notificarFaltaUnica('${al.id}', '${al.nome}', '${al.tel}')"><i class="fas fa-paper-plane"></i></button>
+                                <button class="btn btn-sm btn-light text-warning me-2" onclick="window.abrirModalFalta('${alData.id}','${alData.nome}')" title="Abonar Período"><i class="fas fa-notes-medical"></i></button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="window.notificarFaltaUnica('${alData.id}', '${alData.nome}', '${alData.tel}')"><i class="fas fa-paper-plane"></i></button>
                             </td>
                         </tr>`;
                     });
@@ -1476,7 +1477,6 @@
                     const al = mapaAlunos[nome];
                     if (!al) continue;
 
-                    // REGRA DE OURO: SE ELE ESTIVER NO INTERVALO DE 6 A 8 E JA FEZ A REUNIAO, ELE SAI DA LISTA ATE CHEGAR A 9
                     if (qtd >= 6 && qtd < 9 && al.reuniaoRealizada === true) continue;
 
                     const patamar = (qtd >= 9) ? 9 : (qtd >= 6 ? 6 : 3);
@@ -1519,7 +1519,6 @@
                         </div>`;
 
                     if (!turmasData[al.sala]) turmasData[al.sala] = [];
-                    // Adiciona na frente se nao notificado, no fim se ja notificado (movendo pra tras na fila)
                     if (jaNotificado) turmasData[al.sala].push(itemHtml);
                     else turmasData[al.sala].unshift(itemHtml);
                 }
@@ -1547,12 +1546,11 @@
                     await updateDoc(doc(db, "alunos", id), { reuniaoRealizada: true, dataReuniaoMarcada: null });
                     Swal.fire("Sucesso", "Presença registrada! O aluno só voltará para a lista se atingir 9 atrasos.", "success");
                 } else {
-                    // Resetar notificação para poder enviar o aviso de falta na reunião
                     await updateDoc(doc(db, "alunos", id), { 
                         reuniaoRealizada: false, 
-                        qtdAtrasoNotificada: 5 // volta um nivel para o botão de notificar 6 liberar
+                        qtdAtrasoNotificada: 5 
                     });
-                    Swal.fire("Atenção", "Falta registrada. O botão de notificação foi liberado para que você possa avisar o responsável sobre a falta.", "info");
+                    Swal.fire("Atenção", "Falta registrada. O botão de notificação foi liberado.", "info");
                 }
             } catch (e) { console.error(e); }
         };
@@ -1568,7 +1566,6 @@
             const termo = document.getElementById('inputBuscaManual').value.toLowerCase();
             const select = document.getElementById('reg-manual-aluno');
             const options = select.options;
-            
             for (let i = 0; i < options.length; i++) {
                 const texto = options[i].text.toLowerCase();
                 options[i].style.display = texto.includes(termo) ? "" : "none";
@@ -1578,15 +1575,11 @@
         window.salvarAtrasoManual = async () => {
             const rawVal = document.getElementById('reg-manual-aluno').value;
             if(!rawVal) return Swal.fire("Atenção", "Selecione um aluno na lista.", "warning");
-            
             const alData = JSON.parse(rawVal);
             const dataSel = document.getElementById('reg-manual-data').value;
             const horaSel = document.getElementById('reg-manual-hora').value;
-
             if(!dataSel || !horaSel) return Swal.fire("Atenção", "Preencha todos os campos", "warning");
-
             const dataFormatada = new Date(dataSel + 'T00:00:00').toLocaleDateString('pt-BR');
-
             try {
                 await addDoc(collection(db, "frequencia"), {
                     escolaId: logado.escolaId,
@@ -1598,7 +1591,7 @@
                     tipo: "Manual"
                 });
                 bootstrap.Modal.getInstance(document.getElementById('modalRegistroManualAtraso')).hide();
-                Swal.fire("Sucesso", "Atraso registrado. A lista será atualizada.", "success");
+                Swal.fire("Sucesso", "Atraso registrado.", "success");
             } catch (e) { Swal.fire("Erro", "Falha ao registrar.", "error"); }
         };
 
@@ -1613,33 +1606,26 @@
         window.salvarJustificativa = async () => {
             const id = document.getElementById('just-aluno-id').value;
             const data = document.getElementById('just-data-select').value;
-            const motivo = document.getElementById('just-motivo').value;
-
             try {
                 const docRef = doc(db, "alunos", id);
                 const snap = await getDoc(docRef);
                 const atuais = snap.data().justificativas || [];
                 atuais.push(data);
-                
                 await updateDoc(docRef, { justificativas: atuais });
                 bootstrap.Modal.getInstance(document.getElementById('modalJustificarAtraso')).hide();
-                Swal.fire("Justificado", `O atraso do dia ${data} foi abonado.`, "success");
+                Swal.fire("Justificado", "Atraso abonado.", "success");
             } catch (e) { Swal.fire("Erro", "Falha ao salvar.", "error"); }
         };
 
         window.prepararNotificacaoAtraso = async (id, nome, tel, qtd, datas) => {
-            if (!tel) return Swal.fire("Erro", "Aluno sem WhatsApp do responsável.", "error");
-            
+            if (!tel) return Swal.fire("Erro", "Aluno sem WhatsApp.", "error");
             const snap = await getDoc(doc(db, "alunos", id));
             const aluno = snap.data();
             const hoje = new Date().toLocaleDateString('pt-BR');
-
             let patamar = (qtd >= 9) ? 9 : (qtd >= 6 ? 6 : 3);
-
             if (aluno.qtdAtrasoNotificada == patamar && aluno.ultimoEnvioAtraso == hoje) {
-                return Swal.fire("Atenção", "Notificação para este nível já enviada hoje.", "info");
+                return Swal.fire("Atenção", "Notificação já enviada hoje.", "info");
             }
-            
             if (patamar == 6) {
                 document.getElementById('reuniao-aluno-id').value = id;
                 document.getElementById('reuniao-aluno-nome').value = nome;
@@ -1647,7 +1633,6 @@
                 new bootstrap.Modal(document.getElementById('modalAgendarReuniao')).show();
                 return;
             }
-
             window.enviarMensagemAtraso(id, nome, tel, patamar, datas);
         };
 
@@ -1657,9 +1642,7 @@
             const tel = document.getElementById('reuniao-aluno-tel').value;
             const d = document.getElementById('reuniao-data').value;
             const h = document.getElementById('reuniao-hora').value;
-
             if (!d || !h) return Swal.fire("Atenção", "Informe data e hora.", "warning");
-
             const dataFormat = new Date(d + 'T00:00:00').toLocaleDateString('pt-BR');
             window.enviarMensagemAtraso(id, nome, tel, 6, "", dataFormat, h);
             bootstrap.Modal.getInstance(document.getElementById('modalAgendarReuniao')).hide();
@@ -1669,74 +1652,38 @@
             const hoje = new Date().toLocaleDateString('pt-BR');
             const alunoDoc = await getDoc(doc(db, "alunos", id));
             const dadosAlu = alunoDoc.exists() ? alunoDoc.data() : {};
-            const salaAlu = dadosAlu.sala || "Não informada";
+            const salaAlu = dadosAlu.sala || "---";
             const escolaNome = configUnidadeGlobal.nome.toUpperCase();
-
             let mensagem = "";
-
-            const m3 = [
-                `*AcessaEdu | Notificação de Pontualidade* 🏫\n\nOlá, informamos que o(a) aluno(a) *${nome.toUpperCase()}* (${salaAlu}) atingiu o 3º atraso acumulado na escola *${escolaNome}*.\nA pontualidade é essencial para o aprendizado.\n\n*Datas:* ${listaDatasZapi}\n\nFavor orientar o estudante sobre os horários.`,
-                `*Informativo Escolar | Unidade ${escolaNome}* ⌚\n\nComunicamos que o(a) estudante *${nome.toUpperCase()}* registrou hoje seu 3º atraso. Pedimos a colaboração dos pais para garantir que o aluno não perca as primeiras aulas.`
-            ];
-
-            const m6 = [
-                `*ACESSAEDU | CONVOCAÇÃO PARA REUNIÃO* 🚨\n\nO(A) aluno(a) *${nome.toUpperCase()}* atingiu 6 atrasos. Convocamos os responsáveis para uma reunião presencial.\n\n📅 Data: *${dataR}*\n⌚ Hora: *${horaR}*\nLocal: Secretaria da Escola *${escolaNome}*.\n\nFavor confirmar presença.`
-            ];
-
-            const m9 = [
-                `*ACESSAEDU | NOTIFICAÇÃO CRÍTICA* 🛑\n\nInformamos aos responsáveis que o(a) aluno(a) *${nome.toUpperCase()}* atingiu 9 atrasos. Seguindo as normas escolares, o histórico será encaminhado ao *Conselho Tutelar* para acompanhamento.\n\n*Relatório:* ${listaDatasZapi}\n\nUnidade: ${escolaNome}.`
-            ];
-
-            if (qtd == 3) mensagem = m3[Math.floor(Math.random() * m3.length)];
-            else if (qtd == 6) mensagem = m6[0];
-            else if (qtd == 9) mensagem = m9[0];
-
+            const m3 = [`*AcessaEdu | Notificação de Pontualidade* 🏫\n\nOlá, o aluno *${nome.toUpperCase()}* (${salaAlu}) atingiu o 3º atraso na escola *${escolaNome}*.\nDatas: ${listaDatasZapi}`];
+            const m6 = [`*ACESSAEDU | CONVOCAÇÃO* 🚨\n\nO aluno *${nome.toUpperCase()}* atingiu 6 atrasos. Favor comparecer à escola *${escolaNome}* no dia *${dataR}* às *${horaR}* para reunião.`];
+            const m9 = [`*ACESSAEDU | ALERTA CRÍTICO* 🛑\n\nO aluno *${nome.toUpperCase()}* atingiu 9 atrasos na escola *${escolaNome}*. Histórico enviado ao Conselho Tutelar.`];
+            if (qtd == 3) mensagem = m3[0]; else if (qtd == 6) mensagem = m6[0]; else if (qtd == 9) mensagem = m9[0];
             if (await window.processarZapiAtraso(tel, mensagem)) {
                 const upData = { ultimoEnvioAtraso: hoje, qtdAtrasoNotificada: qtd };
-                if(qtd === 6) {
-                    upData.dataReuniaoMarcada = dataR;
-                    upData.horaReuniaoMarcada = horaR;
-                    upData.reuniaoRealizada = false;
-                }
+                if(qtd === 6) { upData.dataReuniaoMarcada = dataR; upData.horaReuniaoMarcada = horaR; upData.reuniaoRealizada = false; }
                 await updateDoc(doc(db, "alunos", id), upData);
                 Swal.fire("Sucesso", "Notificação enviada e botão travado.", "success");
             }
         };
 
         window.dispararNotificacoesMassaAtraso = async () => {
-            const confirm = await Swal.fire({
-                title: 'Disparo em Massa',
-                text: "Notificar quem atingiu 3 ou 9 atrasos hoje pela primeira vez?",
-                icon: 'warning',
-                showCancelButton: true
-            });
-
+            const confirm = await Swal.fire({ title: 'Disparo em Massa', text: "Notificar atrasos de hoje?", icon: 'warning', showCancelButton: true });
             if (confirm.isConfirmed) {
                 Swal.fire({title: 'Processando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
-                
                 const alunosSnap = await getDocs(query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId)));
                 const freqSnap = await getDocs(query(collection(db, "frequencia"), where("escolaId", "==", logado.escolaId)));
-                
                 const mapaFreq = {};
                 freqSnap.forEach(d => {
-                    const f = d.data();
-                    const [h, m] = f.hora.split(':').map(Number);
-                    if((h*60+m) >= 466) {
-                        if(!mapaFreq[f.nome]) mapaFreq[f.nome] = new Set();
-                        mapaFreq[f.nome].add(f.data);
-                    }
+                    const f = d.data(); const [h, m] = f.hora.split(':').map(Number);
+                    if((h*60+m) >= 466) { if(!mapaFreq[f.nome]) mapaFreq[f.nome] = new Set(); mapaFreq[f.nome].add(f.data); }
                 });
-
                 let totalEnviados = 0;
                 for(let docAlu of alunosSnap.docs) {
-                    const al = docAlu.data();
-                    const atrasosValidos = Array.from(mapaFreq[al.nome] || []).filter(d => !(al.justificativas || []).includes(d));
-                    const qtd = atrasosValidos.length;
-                    const patamar = (qtd >= 9) ? 9 : (qtd >= 6 ? 6 : (qtd >= 3 ? 3 : 0));
-
+                    const al = docAlu.data(); const atrasosValidos = Array.from(mapaFreq[al.nome] || []).filter(d => !(al.justificativas || []).includes(d));
+                    const qtd = atrasosValidos.length; const patamar = (qtd >= 9) ? 9 : (qtd >= 6 ? 6 : (qtd >= 3 ? 3 : 0));
                     if(patamar > 0 && patamar != 6 && al.qtdAtrasoNotificada != patamar && al.tel) {
-                        await window.enviarMensagemAtraso(docAlu.id, al.nome, al.tel, patamar, atrasosValidos.join(', '));
-                        totalEnviados++;
+                        await window.enviarMensagemAtraso(docAlu.id, al.nome, al.tel, patamar, atrasosValidos.join(', ')); totalEnviados++;
                     }
                 }
                 Swal.fire("Finalizado", `${totalEnviados} notificações enviadas.`, "success");
