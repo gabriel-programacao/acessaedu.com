@@ -824,8 +824,6 @@
             window.carregarFaltasDoDia();
         }
 
-        /* --- LÓGICA DE FALTAS DO DIA REFORMULADA --- */
-
         window.carregarFaltasDoDia = async () => {
             const dataSelStr = document.getElementById('dataFaltaDia').value;
             if(!dataSelStr) return;
@@ -848,8 +846,8 @@
 
                 const turmas = {};
                 snapAlunos.forEach(docAlu => {
-                    const alu = docAlu.data();
-                    const justificativas = alu.justificativasFalta || [];
+                    const al = docAlu.data();
+                    const justificativas = al.justificativasFalta || [];
                     
                     if(!nomesPresentes.has(alu.nome) && !justificativas.includes(dataFormatada)) {
                         if(!turmas[alu.sala]) turmas[alu.sala] = [];
@@ -1428,12 +1426,12 @@
             if(chartB) chartB.destroy(); chartB = new Chart(document.getElementById('chartBarras'), { type: 'bar', data: { labels: ['Total', 'Presentes'], datasets: [{ data: [t, p], backgroundColor: ['#003399', '#10b981'] }] }, options: { plugins: { legend: { display: false } } } });
         }
 
-        // --- FUNÇÃO PARA VER HISTÓRICO DE DATAS ---
         window.toggleHistorico = (id) => {
             const el = document.getElementById('hist-'+id);
             if(el) el.classList.toggle('show');
         };
 
+        // --- ABA DE ATRASOS RECORRENTES (LOGICA SOLICITADA PELO USUARIO) ---
         async function escutarAtrasosRecorrentes() {
             onSnapshot(query(collection(db, "frequencia"), where("escolaId", "==", logado.escolaId)), async snapFreq => {
                 const alunosSnap = await getDocs(query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId)));
@@ -1451,19 +1449,16 @@
                 docsOrdenados.forEach(f => {
                     const chaveUnicaDia = `${f.nome}_${f.data}`;
                     if (entradasJaProcessadas.has(chaveUnicaDia)) return; 
-                    
                     entradasJaProcessadas.add(chaveUnicaDia);
 
                     const [hora, min] = f.hora.split(':').map(Number);
                     const totalMinutos = (hora * 60) + min;
                     
-                    if (totalMinutos >= 466) { // 07:46
+                    if (totalMinutos >= 466) { 
                         const al = mapaAlunos[f.nome];
                         const justificativas = al?.justificativas || [];
-                        
                         if (!justificativas.includes(f.data)) {
                             if (!atrasosPorAluno[f.nome]) atrasosPorAluno[f.nome] = [];
-                            // Guardamos Data e Hora agora
                             atrasosPorAluno[f.nome].push({ data: f.data, hora: f.hora });
                         }
                     }
@@ -1471,7 +1466,7 @@
 
                 const accordion = document.getElementById('accordionAtrasos');
                 accordion.innerHTML = "";
-                const turmas = {};
+                const turmasData = {};
 
                 for (let nome in atrasosPorAluno) {
                     const listaEventos = atrasosPorAluno[nome];
@@ -1481,42 +1476,55 @@
                     const al = mapaAlunos[nome];
                     if (!al) continue;
 
-                    if (!turmas[al.sala]) turmas[al.sala] = "";
-                    
-                    const corBadge = qtd >= 9 ? 'bg-danger' : (qtd >= 6 ? 'bg-warning text-dark' : 'bg-primary');
-                    const labelStatus = qtd >= 9 ? 'CONSELHO TUTELAR' : (qtd >= 6 ? 'CONVOCAR RESPONSÁVEL' : 'NOTIFICAR ADVERTÊNCIA');
-                    
-                    let infoNotificacao = "";
-                    if (al.ultimoEnvioAtraso && al.qtdAtrasoNotificada == (qtd >= 9 ? 9 : (qtd >= 6 ? 6 : 3))) {
-                        infoNotificacao = `<br><span class="badge bg-light text-dark border mt-1">Mensagem enviada em: ${al.ultimoEnvioAtraso}</span>`;
+                    // REGRA DE OURO: SE ELE ESTIVER NO INTERVALO DE 6 A 8 E JA FEZ A REUNIAO, ELE SAI DA LISTA ATE CHEGAR A 9
+                    if (qtd >= 6 && qtd < 9 && al.reuniaoRealizada === true) continue;
+
+                    const patamar = (qtd >= 9) ? 9 : (qtd >= 6 ? 6 : 3);
+                    const jaNotificado = (al.qtdAtrasoNotificada == patamar);
+
+                    let acaoHtml = "";
+                    if (qtd >= 6 && qtd < 9 && al.dataReuniaoMarcada) {
+                        acaoHtml = `
+                            <div class="mt-2 p-2 bg-light rounded-3 small border">
+                                <b>Reunião Agendada:</b> ${al.dataReuniaoMarcada} às ${al.horaReuniaoMarcada}<br>
+                                <span class="text-primary fw-bold">Responsável compareceu?</span>
+                                <div class="btn-group btn-group-sm w-100 mt-1">
+                                    <button class="btn btn-outline-success" onclick="window.marcarComparecimentoReuniao('${al.id}', true)">SIM</button>
+                                    <button class="btn btn-outline-danger" onclick="window.marcarComparecimentoReuniao('${al.id}', false)">NÃO</button>
+                                </div>
+                            </div>`;
                     }
 
-                    // Gerar lista de datas e horas para o clique
                     const htmlHistorico = listaEventos.map(ev => `• ${ev.data} às ${ev.hora}`).join('<br>');
-                    const datasSoTexto = listaEventos.map(ev => ev.data).join(', ');
+                    const datasTexto = listaEventos.map(ev => ev.data).join(', ');
 
-                    turmas[al.sala] += `
-                        <div class="user-item p-3 mb-2 rounded-4 border bg-white d-flex justify-content-between align-items-center">
+                    const itemHtml = `
+                        <div class="user-item p-3 mb-2 rounded-4 border bg-white d-flex justify-content-between align-items-center" style="order:${jaNotificado ? 1 : 0}">
                             <div style="cursor:pointer; flex-grow:1;" onclick="window.toggleHistorico('${al.id}')">
                                 <span class="fw-bold text-uppercase small">${nome}</span>
-                                <span class="badge ${corBadge} ms-2">${qtd} ATRASOS</span>
-                                ${infoNotificacao}
-                                <br><small class="text-muted">Status: <b>${labelStatus}</b></small>
+                                <span class="badge ${qtd >= 9 ? 'bg-danger' : (qtd >= 6 ? 'bg-warning text-dark' : 'bg-primary')} ms-2">${qtd} ATRASOS</span>
+                                <br><small class="text-muted">Status: <b>${qtd >= 9 ? 'CONSELHO TUTELAR' : (qtd >= 6 ? 'CONVOCAR RESPONSÁVEL' : 'ADVERTÊNCIA')}</b></small>
+                                ${acaoHtml}
                                 <div class="atraso-historico" id="hist-${al.id}">
-                                    <strong>Histórico Detalhado:</strong><br>
-                                    ${htmlHistorico}
+                                    <strong>Histórico:</strong><br>${htmlHistorico}
                                 </div>
                             </div>
                             <div class="d-flex gap-2">
                                 <button class="btn btn-sm btn-outline-secondary" onclick="window.abrirModalJustificar('${al.id}', '${nome}', '${listaEventos.map(e=>e.data).join('|')}')">JUSTIFICAR</button>
-                                <button class="btn btn-sm btn-primary-modern" onclick="window.prepararNotificacaoAtraso('${al.id}', '${nome}', '${al.tel}', ${qtd}, '${datasSoTexto}')">
-                                    <i class="fas fa-paper-plane me-1"></i> NOTIFICAR
+                                <button class="btn btn-sm ${jaNotificado ? 'btn-success disabled' : 'btn-primary-modern'}" 
+                                        onclick="window.prepararNotificacaoAtraso('${al.id}', '${nome}', '${al.tel}', ${qtd}, '${datasTexto}')">
+                                    ${jaNotificado ? '<i class="fas fa-check"></i> JÁ NOTIFICADO' : '<i class="fas fa-paper-plane"></i> NOTIFICAR'}
                                 </button>
                             </div>
                         </div>`;
+
+                    if (!turmasData[al.sala]) turmasData[al.sala] = [];
+                    // Adiciona na frente se nao notificado, no fim se ja notificado (movendo pra tras na fila)
+                    if (jaNotificado) turmasData[al.sala].push(itemHtml);
+                    else turmasData[al.sala].unshift(itemHtml);
                 }
 
-                for (let sala in turmas) {
+                for (let sala in turmasData) {
                     const idS = sala.replace(/\s+/g, '-');
                     accordion.innerHTML += `
                         <div class="accordion-item border-0 mb-2 shadow-sm rounded-4 overflow-hidden">
@@ -1526,12 +1534,28 @@
                                 </button>
                             </h2>
                             <div id="accA-${idS}" class="accordion-collapse collapse">
-                                <div class="accordion-body bg-light p-3">${turmas[sala]}</div>
+                                <div class="accordion-body bg-light p-3 d-flex flex-column">${turmasData[sala].join('')}</div>
                             </div>
                         </div>`;
                 }
             });
         }
+
+        window.marcarComparecimentoReuniao = async (id, presente) => {
+            try {
+                if (presente) {
+                    await updateDoc(doc(db, "alunos", id), { reuniaoRealizada: true, dataReuniaoMarcada: null });
+                    Swal.fire("Sucesso", "Presença registrada! O aluno só voltará para a lista se atingir 9 atrasos.", "success");
+                } else {
+                    // Resetar notificação para poder enviar o aviso de falta na reunião
+                    await updateDoc(doc(db, "alunos", id), { 
+                        reuniaoRealizada: false, 
+                        qtdAtrasoNotificada: 5 // volta um nivel para o botão de notificar 6 liberar
+                    });
+                    Swal.fire("Atenção", "Falta registrada. O botão de notificação foi liberado para que você possa avisar o responsável sobre a falta.", "info");
+                }
+            } catch (e) { console.error(e); }
+        };
 
         window.abrirModalRegistroManual = () => {
             document.getElementById('reg-manual-data').valueAsDate = new Date();
@@ -1600,7 +1624,6 @@
                 await updateDoc(docRef, { justificativas: atuais });
                 bootstrap.Modal.getInstance(document.getElementById('modalJustificarAtraso')).hide();
                 Swal.fire("Justificado", `O atraso do dia ${data} foi abonado.`, "success");
-                window.carregarFaltasDoDia();
             } catch (e) { Swal.fire("Erro", "Falha ao salvar.", "error"); }
         };
 
@@ -1643,58 +1666,42 @@
         };
 
         window.enviarMensagemAtraso = async (id, nome, tel, qtd, listaDatasZapi, dataR = "", horaR = "") => {
-    const hoje = new Date().toLocaleDateString('pt-BR');
-    
-    // BUSCA A SALA E DADOS DO ALUNO NO MOMENTO DO ENVIO
-    const alunoDoc = await getDoc(doc(db, "alunos", id));
-    const dadosAlu = alunoDoc.exists() ? alunoDoc.data() : {};
-    const salaAlu = dadosAlu.sala || "Não informada";
-    const escolaNome = configUnidadeGlobal.nome.toUpperCase();
+            const hoje = new Date().toLocaleDateString('pt-BR');
+            const alunoDoc = await getDoc(doc(db, "alunos", id));
+            const dadosAlu = alunoDoc.exists() ? alunoDoc.data() : {};
+            const salaAlu = dadosAlu.sala || "Não informada";
+            const escolaNome = configUnidadeGlobal.nome.toUpperCase();
 
-    let mensagem = "";
+            let mensagem = "";
 
-    // --- 10 MODELOS PARA 3 ATRASOS (Foco: Alerta de Rendimento e Rotina) ---
-    const m3 = [
-        `*AcessaEdu | Notificação de Frequência Escolar* 🏫\n\nPrezados responsáveis pelo(a) aluno(a) *${nome.toUpperCase()}*, da turma *${salaAlu}*. Notificamos que o sistema de biometria da escola *${escolaNome}* registrou o 3º atraso acumulado neste período. Ressaltamos que a entrada após o horário permitido compromete o acompanhamento integral das atividades pedagógicas iniciadas em sala.\n\n*Registros de entrada tardia:*\n${listaDatasZapi}\n\nPedimos a colaboração da família para regularizar a pontualidade. *Favor responder este informativo com "OK, ESTOU CIENTE".* ✅`,
-        
-        `*Informativo de Acesso e Pontualidade | AcessaEdu* ⌚\n\nComunicamos que o(a) estudante *${nome.toUpperCase()}* (*${salaAlu}*) atingiu hoje a marca de 3 entradas fora do horário regulamentar na unidade *${escolaNome}*. A organização do tempo é um pilar essencial para o aprendizado e disciplina do aluno.\n\n*Histórico verificado:*\n${listaDatasZapi}\n\nSolicitamos que acompanhem de perto o horário de saída de casa. *Por gentileza, acuse o recebimento enviando um "RECEBIDO".* ✨`,
-        
-        `*Aviso Oficial de Frequência - Unidade ${escolaNome}* 🚩\n\nAtenção responsáveis, o sistema AcessaEdu identificou que *${nome.toUpperCase()}* da sala *${salaAlu}* possui 3 registros de atraso. Informamos que a pontualidade é registrada diariamente e o acúmulo de ocorrências poderá gerar convocações presenciais.\n\n*Relação de datas e horários:*\n${listaDatasZapi}\n\nContamos com sua parceria para evitar novos episódios. *Responda esta mensagem com "OK" para validarmos a notificação.* 🤝`
-    ];
+            const m3 = [
+                `*AcessaEdu | Notificação de Pontualidade* 🏫\n\nOlá, informamos que o(a) aluno(a) *${nome.toUpperCase()}* (${salaAlu}) atingiu o 3º atraso acumulado na escola *${escolaNome}*.\nA pontualidade é essencial para o aprendizado.\n\n*Datas:* ${listaDatasZapi}\n\nFavor orientar o estudante sobre os horários.`,
+                `*Informativo Escolar | Unidade ${escolaNome}* ⌚\n\nComunicamos que o(a) estudante *${nome.toUpperCase()}* registrou hoje seu 3º atraso. Pedimos a colaboração dos pais para garantir que o aluno não perca as primeiras aulas.`
+            ];
 
-    // --- 10 MODELOS PARA 6 ATRASOS (Foco: Convocação Presencial e Regimento) ---
-    const m6 = [
-        `*ACESSAEDU | CONVOCAÇÃO PARA REUNIÃO DE ALINHAMENTO* 🚨\n\nInformamos com urgência que o(a) aluno(a) *${nome.toUpperCase()}*, matriculado(a) na turma *${salaAlu}*, atingiu o limite de 6 atrasos recorrentes na escola *${escolaNome}*. Conforme o regimento escolar, a persistência deste comportamento exige uma intervenção presencial com a coordenação.\n\n*Histórico detalhado:*\n${listaDatasZapi}\n\n📍 *REUNIÃO AGENDADA:* \n📅 Data: *${dataR}*\n⌚ Hora: *${horaR}*\nLocal: Secretaria da Unidade\n\n*Sua presença é indispensável. Favor confirmar com "OK, ESTAREI PRESENTE".* 🤝`,
+            const m6 = [
+                `*ACESSAEDU | CONVOCAÇÃO PARA REUNIÃO* 🚨\n\nO(A) aluno(a) *${nome.toUpperCase()}* atingiu 6 atrasos. Convocamos os responsáveis para uma reunião presencial.\n\n📅 Data: *${dataR}*\n⌚ Hora: *${horaR}*\nLocal: Secretaria da Escola *${escolaNome}*.\n\nFavor confirmar presença.`
+            ];
 
-        `*Alerta de Convocação Presencial | Gestão Escolar* 🏫\n\nA coordenação da escola *${escolaNome}* convoca os responsáveis pelo(a) estudante *${nome.toUpperCase()}* (*${salaAlu}*) para uma reunião obrigatória. O sistema AcessaEdu contabilizou 6 entradas tardias, o que torna necessária uma conversa para evitar prejuízos maiores ao ano letivo.\n\n🗓️ *DATA E HORA:* ${dataR} às ${horaR}\n\n*Pedimos que confirme o comparecimento respondendo "CONFIRMADO".* A parceria escola-família é a base do sucesso do aluno. ✨`,
+            const m9 = [
+                `*ACESSAEDU | NOTIFICAÇÃO CRÍTICA* 🛑\n\nInformamos aos responsáveis que o(a) aluno(a) *${nome.toUpperCase()}* atingiu 9 atrasos. Seguindo as normas escolares, o histórico será encaminhado ao *Conselho Tutelar* para acompanhamento.\n\n*Relatório:* ${listaDatasZapi}\n\nUnidade: ${escolaNome}.`
+            ];
 
-        `*Notificação de Nível Crítico - AcessaEdu* ⚠️\n\nPrezados, o(a) aluno(a) *${nome.toUpperCase()}* (*${salaAlu}*) registrou seu 6º atraso oficial. Informamos que, a partir deste momento, novas ocorrências serão tratadas com maior rigor administrativo.\n\n*Aguardamos o responsável na escola no dia ${dataR} às ${horaR}.*\n\n*Por favor, envie um "OK" como sinal de que recebeu este chamado.* ✅`
-    ];
+            if (qtd == 3) mensagem = m3[Math.floor(Math.random() * m3.length)];
+            else if (qtd == 6) mensagem = m6[0];
+            else if (qtd == 9) mensagem = m9[0];
 
-    // --- 10 MODELOS PARA 9 ATRASOS (Foco: Medida Legal e Conselho Tutelar) ---
-    const m9 = [
-        `*ACESSAEDU | NOTIFICAÇÃO DE ENCAMINHAMENTO AO CONSELHO TUTELAR* 🛑\n\nInformamos aos responsáveis que, esgotadas as tentativas de resolução interna na escola *${escolaNome}*, o(a) aluno(a) *${nome.toUpperCase()}* (*${salaAlu}*) atingiu a marca de 9 atrasos. Seguindo a Lei de Diretrizes e Bases e o Estatuto da Criança e do Adolescente (ECA), o histórico de infrequência será formalmente encaminhado ao *Conselho Tutelar* para providências cabíveis.\n\n*Relatório Final de Atrasos:*\n${listaDatasZapi}\n\nA escola zela pelo direito constitucional do aluno à educação integral.\n\n*Responda "OK" para ciência de que este comunicado foi entregue.* 🛡️`,
-
-        `*Comunicado de Medida Administrativa Externa* 🚩\n\nAtenção. O sistema AcessaEdu encerrou o ciclo de notificações internas para o(a) estudante *${nome.toUpperCase()}* da turma *${salaAlu}* devido ao atingimento de 9 atrasos. O prontuário escolar com a relação de entradas tardias será protocolado junto aos órgãos de proteção à infância e adolescência ainda hoje.\n\n*Favor responder com "CIENTE" para o registro do protocolo de envio automático.* ⚠️`,
-
-        `*Alerta Crítico Final - Gestão de Frequência* 🛑\n\nNotificamos que o limite de tolerância escolar para atrasos de *${nome.toUpperCase()}* (*${salaAlu}*) foi excedido (9 ocorrências). A instituição *${escolaNome}* está oficiando o Conselho Tutelar para intervenção junto à família.\n\n*Confirme a visualização com um "OK".* A educação é um compromisso compartilhado e obrigatório. 🛡️`
-    ];
-
-    // LÓGICA DE SORTEIO (Expandir para 10 modelos cada seguindo o padrão acima)
-    if (qtd == 3) {
-        mensagem = m3[Math.floor(Math.random() * m3.length)];
-    } else if (qtd == 6) {
-        mensagem = m6[Math.floor(Math.random() * m6.length)];
-    } else if (qtd == 9) {
-        mensagem = m9[Math.floor(Math.random() * m9.length)];
-    }
-
-    // DISPARO COM Z-API
-    if (await window.processarZapiAtraso(tel, mensagem)) {
-        await updateDoc(doc(db, "alunos", id), { ultimoEnvioAtraso: hoje, qtdAtrasoNotificada: qtd });
-        Swal.fire("Sucesso", "Notificação enviada com os dados da sala!", "success");
-    }
-};
+            if (await window.processarZapiAtraso(tel, mensagem)) {
+                const upData = { ultimoEnvioAtraso: hoje, qtdAtrasoNotificada: qtd };
+                if(qtd === 6) {
+                    upData.dataReuniaoMarcada = dataR;
+                    upData.horaReuniaoMarcada = horaR;
+                    upData.reuniaoRealizada = false;
+                }
+                await updateDoc(doc(db, "alunos", id), upData);
+                Swal.fire("Sucesso", "Notificação enviada e botão travado.", "success");
+            }
+        };
 
         window.dispararNotificacoesMassaAtraso = async () => {
             const confirm = await Swal.fire({
