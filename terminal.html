@@ -87,9 +87,11 @@
                 await faceapi.nets.faceRecognitionNet.loadFromUri(URL_MODELS);
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 document.getElementById('video').srcObject = stream;
+                
                 const snap = await getDocs(query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId)));
                 const mapaAlunos = {};
                 const labledDescriptors = [];
+                
                 snap.forEach(d => {
                     const data = d.data();
                     if(data.descritor) {
@@ -97,34 +99,57 @@
                         labledDescriptors.push(new faceapi.LabeledFaceDescriptors(data.nome, [new Float32Array(data.descritor)]));
                     }
                 });
-                const faceMatcher = new faceapi.FaceMatcher(labledDescriptors, 0.60); 
+
+                // Aumentamos o rigor aqui (0.45 é mais preciso que 0.60)
+                const faceMatcher = new faceapi.FaceMatcher(labledDescriptors, 0.45); 
+
                 setInterval(async () => {
                     if(isProcessing) return;
                     const video = document.getElementById('video');
                     const molduraEl = document.getElementById('moldura');
+                    
                     const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+                    
                     if(detection) {
                         const box = detection.detection.box;
-                        const vW = video.videoWidth; const vH = video.videoHeight;
+                        const vW = video.videoWidth; 
+                        const vH = video.videoHeight;
                         const faceCenterX = box.x + (box.width / 2);
                         const faceCenterY = box.y + (box.height / 2);
-                        const enquadradoH = faceCenterX > (vW * 0.35) && faceCenterX < (vW * 0.65);
-                        const enquadradoV = faceCenterY > (vH * 0.30) && faceCenterY < (vH * 0.70);
-                        const tamanhoCerto = box.height > (vH * 0.40);
+                        
+                        // Melhoria no enquadramento
+                        const enquadradoH = faceCenterX > (vW * 0.30) && faceCenterX < (vW * 0.70);
+                        const enquadradoV = faceCenterY > (vH * 0.25) && faceCenterY < (vH * 0.75);
+                        const tamanhoCerto = box.height > (vH * 0.35);
+
                         if (enquadradoH && enquadradoV && tamanhoCerto) {
                             molduraEl.classList.add('detected');
                             const match = faceMatcher.findBestMatch(detection.descriptor);
+                            
                             if(match.label !== 'unknown') {
                                 const nome = match.label;
                                 const agora = Date.now();
                                 if(nome === ultimoNomeDetectado && (agora - tempoUltimaDeteccao) < 30000) return;
                                 isProcessing = true;
                                 processarPresenca(nome, mapaAlunos[nome]);
+                            } else {
+                                // Caso o rosto esteja na moldura mas não seja reconhecido
+                                isProcessing = true;
+                                exibirNaoCadastrado();
                             }
                         } else { molduraEl.classList.remove('detected'); }
                     } else { molduraEl.classList.remove('detected'); }
                 }, 600);
             } catch (err) { console.error(err); }
+        }
+
+        function exibirNaoCadastrado() {
+            document.getElementById('display').innerHTML = `
+                <div class="card-bloqueio" style="background: #6c757d;">
+                    <h2>ALUNO NÃO CADASTRADO</h2>
+                    <p>Rosto não reconhecido no sistema.</p>
+                </div>`;
+            setTimeout(resetDisplay, 3000);
         }
 
         async function processarPresenca(nome, info) {
@@ -167,10 +192,8 @@
             const dataHoje = new Date().toLocaleDateString('pt-BR');
             const registroId = Math.random().toString(36).substring(7).toUpperCase();
 
-            // --- 10 SAUDAÇÕES ---
             const saudacoes = ["*AcessaEdu | Notificação de Entrada*", "*Informativo Escolar Importante*", "*Comunicado de Frequência*", "Prezados Pais e Responsáveis,", "Olá! Notificamos que:", "*Alerta de Atraso Escolar*", "Saudações da coordenação escolar.", "Atenção: Registro de Entrada Tardia", "*AcessaEdu | Controle de Acesso*", "Aviso de Horário Escolar:"];
 
-            // --- 10 CORPOS COM ÊNFASE NA DATA/HORA ---
             const corpos = [
                 `Informamos que o(a) aluno(a) *${nomeU}* registrou sua entrada na unidade *${escolaU}* APÓS o horário permitido para o início das atividades escolares.\n\n📅 Data: ${dataHoje}\n⏰ Horário de Chegada: ${hora}`,
                 `Identificamos através do nosso sistema que *${nomeU}* chegou à escola hoje fora do horário estabelecido. Ressaltamos que a entrada ocorreu depois do limite de tolerância.\n\n📅 Registro em: ${dataHoje}\n⌚ Hora da entrada: ${hora}`,
@@ -184,7 +207,6 @@
                 `Saudações. Notificamos que o(a) aluno(a) *${nomeU}* chegou à unidade *${escolaU}* em um horário posterior ao permitido para o acesso pontual.\n\n📅 Data: ${dataHoje}\n⏰ Horário registrado: ${hora}`
             ];
 
-            // --- 10 INTERAÇÕES ---
             const fechamentos = ["Por favor, responda com *'OK'* se visualizou este informativo.", "Solicitamos que responda com *'CIENTE'* para validarmos a notificação.", "Pedimos que, por gentileza, responda com *'RECEBIDO'* para nosso controle.", "Se você visualizou este aviso, poderia confirmar escrevendo apenas *'OK'*?", "Sua confirmação é essencial para mantermos o registro. Responda com *'SIM'*.", "Pode confirmar o recebimento deste comunicado digitando *'OK'*?", "Contamos com sua colaboração para evitar atrasos rotineiros. Responda com *'OK'*.", "Responda a este alerta com *'CIENTE'* para que possamos registrar sua visualização.", "A parceria entre família e escola é vital. Por favor, responda com *'OK'*.", "Para validar este envio automático, pedimos que responda com *'RECEBIDO'*."];
 
             const s = saudacoes[Math.floor(Math.random() * saudacoes.length)];
