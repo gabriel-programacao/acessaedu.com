@@ -41,6 +41,29 @@
             min-height: 100vh;
         }
 
+        /* Estilo do Contador Flutuante */
+        #floating-bulk-counter {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--primary);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+            animation: slideInRight 0.5s ease;
+        }
+
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
         /* --- SIDEBAR DESIGN MELHORADO --- */
         .sidebar {
             width: var(--sidebar-w);
@@ -341,6 +364,11 @@
     </style>
 </head>
 <body>
+
+    <div id="floating-bulk-counter">
+        <i class="fas fa-paper-plane fa-spin"></i>
+        <span id="bulk-text-status">Enviando 0 de 0...</span>
+    </div>
 
     <div id="broadcast-overlay">
         <div class="broadcast-card">
@@ -866,6 +894,15 @@
         let chartB = null, chartP = null, idAlunoCapturaModal = "";
         let turmaParaApagarGlobal = "";
         let configUnidadeGlobal = null;
+        let isSendingBulk = false; // Flag para controlar o bloqueio de saída
+
+        // --- BLOQUEIO DE SAÍDA DO NAVEGADOR ---
+        window.addEventListener('beforeunload', (e) => {
+            if (isSendingBulk) {
+                e.preventDefault();
+                e.returnValue = 'Atenção: Há um envio de notificações em massa ocorrendo. Se você sair agora, o processo será interrompido.';
+            }
+        });
 
         // --- FUNÇÃO DE ENVIO PARA Z-API ATUALIZADA COM AGENDAMENTO (SCHEDULE) ---
         window.processarZapiAtraso = async (tel, msg, dataAgendadaISO) => {
@@ -1164,6 +1201,7 @@
             const dataSelStr = document.getElementById('dataFaltaDia').value;
             if(!dataSelStr) return;
             const dataFormatada = new Date(dataSelStr + 'T12:00:00').toLocaleDateString('pt-BR');
+            const dataKey = dataFormatada.replaceAll('/', '-');
             const accordion = document.getElementById('accordionFaltasDia');
             accordion.innerHTML = '<div class="text-center py-5"><i class="fas fa-spinner fa-spin fa-2x"></i><br>Analisando turmas...</div>';
 
@@ -1173,9 +1211,15 @@
                 const qPres = query(collection(db, "frequencia"), where("escolaId", "==", logado.escolaId), where("data", "==", dataFormatada));
                 const snapPres = await getDocs(qPres);
                 
-                const logEnviosRef = doc(db, "unidades", logado.escolaId, "log_envio_faltas", dataFormatada.replaceAll('/','-'));
+                // Log da Turma
+                const logEnviosRef = doc(db, "unidades", logado.escolaId, "log_envio_faltas", dataKey);
                 const snapEnvio = await getDoc(logEnviosRef);
                 const enviosTurma = snapEnvio.exists() ? snapEnvio.data() : {};
+
+                // Log Individual dos Alunos
+                const logAlunosRef = doc(db, "unidades", logado.escolaId, "log_alunos_notificados", dataKey);
+                const snapAluLog = await getDoc(logAlunosRef);
+                const enviosAlunos = snapAluLog.exists() ? snapAluLog.data() : {};
 
                 const nomesPresentes = new Set();
                 snapPres.forEach(d => nomesPresentes.add(d.data().nome));
@@ -1201,19 +1245,23 @@
 
                 sortedTurmas.forEach(sala => {
                     const idS = sala.replace(/\s+/g, '-');
-                    const jaEnviado = enviosTurma[sala];
-                    const corBotao = jaEnviado ? 'btn-success' : 'btn-danger';
-                    const textoBotao = jaEnviado ? `<i class="fas fa-check-circle"></i> ENVIADO AS ${jaEnviado}` : `<i class="fas fa-paper-plane"></i> NOTIFICAR TURMA`;
+                    const statusTurma = enviosTurma[sala];
+                    const jaEnviadoTurma = statusTurma && !statusTurma.includes("Processando");
+                    const corBotao = jaEnviadoTurma ? 'btn-success' : (statusTurma === 'Processando...' ? 'btn-warning' : 'btn-danger');
+                    const textoBotao = jaEnviadoTurma ? `<i class="fas fa-check-circle"></i> ENVIADO AS ${statusTurma}` : (statusTurma === 'Processando...' ? `<i class="fas fa-spinner fa-spin"></i> PROCESSANDO...` : `<i class="fas fa-paper-plane"></i> NOTIFICAR TURMA`);
 
                     let rows = "";
                     turmas[sala].forEach(alData => {
+                        const alNotificado = enviosAlunos[alData.id];
                         rows += `
                         <tr>
                             <td class="ps-4 fw-bold small text-uppercase">${alData.nome}</td>
                             <td>${alData.tel || '---'}</td>
                             <td class="text-end pe-4">
                                 <button class="btn btn-sm btn-light text-warning me-2" onclick="window.abrirModalFalta('${alData.id}','${alData.nome}')" title="Abonar Período"><i class="fas fa-notes-medical"></i></button>
-                                <button class="btn btn-sm btn-outline-danger" onclick="window.notificarFaltaUnica('${alData.id}', '${alData.nome}', '${alData.tel}')"><i class="fas fa-paper-plane"></i></button>
+                                <button class="btn btn-sm ${alNotificado ? 'btn-success disabled' : 'btn-outline-danger'}" onclick="window.notificarFaltaUnica('${alData.id}', '${alData.nome}', '${alData.tel}', '${sala}')">
+                                    ${alNotificado ? '<i class="fas fa-check"></i>' : '<i class="fas fa-paper-plane"></i>'}
+                                </button>
                             </td>
                         </tr>`;
                     });
@@ -1226,7 +1274,7 @@
                                     <i class="fas fa-users me-2"></i> ${sala} (${turmas[sala].length} FALTAS)
                                 </button>
                             </h2>
-                            <button class="btn ${corBotao} rounded-pill px-4 fw-bold shadow-sm btn-sm" onclick="window.dispararTurmaMassa('${sala}', '${idS}')" ${jaEnviado ? 'disabled' : ''}>
+                            <button class="btn ${corBotao} rounded-pill px-4 fw-bold shadow-sm btn-sm" onclick="window.dispararTurmaMassa('${sala}', '${idS}')" ${jaEnviadoTurma || statusTurma === 'Processando...' ? 'disabled' : ''}>
                                 ${textoBotao}
                             </button>
                         </div>
@@ -1245,26 +1293,43 @@
         };
 
         const MENSAGENS_FALTA = [
-            "Olá! Notamos que o(a) aluno(a) *{NOME}* faltou hoje à aula. Lembramos que a presença é fundamental para o aprendizado. Favor salvar nosso contato para receber avisos importantes! ✨",
-            "Atenção: O(A) estudante *{NOME}* não compareceu à escola hoje. Caso haja um motivo médico, favor enviar o atestado. Não esqueça de salvar nosso número na sua agenda! 📚",
-            "Prezados pais, informamos que *{NOME}* registrou falta na data de hoje. É muito importante acompanhar a frequência escolar. Por favor, salve nosso contato oficial! ✅",
-            "Sentimos falta do(a) *{NOME}* hoje na escola! O conteúdo de hoje foi muito importante. Se possível, justifique a ausência. Salve este contato para futuras comunicações! 🏫",
-            "Comunicado Escolar: *{NOME}* não esteve presente nas atividades de hoje. Pedimos que priorizem a frequência do aluno. Por favor, salve nosso número nos seus contatos! 📢",
-            "Olá, tudo bem? Notamos a ausência do(a) *{NOME}* hoje. Caso precise de algo, estamos à disposição. Pedimos que salve nosso contato para não perder notificações! 🛡️",
-            "Frequência Escolar: O(A) aluno(a) *{NOME}* faltou hoje. Lembramos que faltas em excesso podem prejudicar a aprovação. Salve nosso contato no seu WhatsApp! ⚠️",
-            "Olá! Passando para informar que *{NOME}* não veio à aula hoje. Esperamos que esteja tudo bem. Salve nosso contato para receber este relatório diariamente! ✨",
-            "Aviso de Ausência: *{NOME}* faltou no dia de hoje. A escola segue à disposição para qualquer dúvida. Importante: salve nosso contato para evitar bloqueios de mensagens! 📲",
-            "Importante: Registramos a falta do(a) estudante *{NOME}* hoje. Contamos com sua parceria para manter a frequência em dia. Por favor, salve nosso contato oficial da escola! 🤝"
+            "📑 *Informativo Escolar Importante*\n\nSaudações. Notificamos que o(a) aluno(a) *{NOME}* FALTOU à unidade *{ESCOLA}* hoje.\n\n⚠️ IMPORTANTE MANTER SEMPRE A FREQUÊNCIA EM DIA.\n📅 Data: {DATA}\n\nPara validar este envio automático, pedimos que responda com 'RECEBIDO'.\n\n*{ESCOLA}* sempre avançando, sempre junto!\n✅ Notificação AcessaEdu\nRef: {REF}",
+            "🔔 *AVISO DE AUSÊNCIA - {ESCOLA}*\n\nPrezados responsáveis, registramos que o(a) aluno(a) *{NOME}* não compareceu à aula na data de hoje.\n\nLembramos que a presença é fundamental para o aprendizado.\n📅 Data: {DATA}\n\nFavor salvar nosso contato para receber este relatório diariamente!\nRef: {REF}",
+            "🏫 *Comunicação Interna*\n\nInformamos que *{NOME}* registrou falta nesta data na unidade *{ESCOLA}*.\n\nPedimos que priorizem a frequência do aluno. Caso haja motivo médico, favor enviar o atestado.\nRef: {REF}\n\nBusca ativa junto da família.",
+            "🛡️ *Notificação AcessaEdu*\n\nSaudações. Comunicamos que *{NOME}* não esteve presente nas atividades letivas hoje.\n\nUnidade: *{ESCOLA}*\nData: {DATA}\n\nPor favor, responda com 'RECEBIDO' para validarmos o envio.\nRef: {REF}",
+            "📢 *Aviso Escolar Urgente*\n\nO(A) estudante *{NOME}* não compareceu à *{ESCOLA}* hoje.\n\nA parceria família e escola é a base do sucesso. Contamos com sua colaboração.\nRef: {REF}\n📅 {DATA}",
+            "⚠️ *Alerta de Frequência - {ESCOLA}*\n\nInformamos a ausência do(a) aluno(a) *{NOME}* nas aulas de hoje.\n\nA educação transforma vidas, e cada aula é um passo importante.\nRef: {REF}\n\nGentileza responder 'CONFIRMADO'.",
+            "📋 *Relatório Diário de Ausência*\n\nUnidade: *{ESCOLA}*\nEstudante: *{NOME}*\nStatus: FALTOU\n\nManter a frequência em dia é vital. Esperamos o retorno amanhã!\n📅 {DATA}\nRef: {REF}",
+            "🤝 *Família e Escola Juntos*\n\nSentimos falta do(a) aluno(a) *{NOME}* hoje na institution *{ESCOLA}*.\n\nAcompanhe de perto os estudos e evite faltas desnecessárias.\nRef: {REF}\n\n✅ Notificação validada.",
+            "📍 *Informativo - {ESCOLA}*\n\nOlá. Notificamos que *{NOME}* não registrou presença em nosso sistema hoje.\n\nPara segurança e acompanhamento pedagógico, mantemos este canal ativo.\n📅 Data: {DATA}\nRef: {REF}",
+            "✨ *Educação em Primeiro Lugar*\n\nInformamos a falta do(a) estudante *{NOME}* na escola *{ESCOLA}*.\n\nPedimos que salve nosso número nos seus contatos para evitar bloqueios de mensagens.\nRef: {REF}",
+            "🌟 *ETE Inforama - {ESCOLA}*\n\nNotificação: *{NOME}* FALTOU à unidade hoje.\n\nIMPORTANTE MANTER A ASSIDUIDADE. Cada aula conta para o futuro!\nData: {DATA}\nRef: {REF}",
+            "📚 *Acompanhamento Escolar*\n\nPrezados, registramos que o(a) aluno(a) *{NOME}* não esteve presente na escola *{ESCOLA}* hoje.\n\nFavor acusar o recebimento desta notificação.\nRef: {REF}",
+            "🚨 *AVISO DE FALTA*\n\nSaudações da unidade *{ESCOLA}*.\n\nInformamos a ausência do aluno *{NOME}* na data de hoje, {DATA}.\n\nSempre avançando, sempre junto!\nRef: {REF}",
+            "🛡️ *Busca Ativa - {ESCOLA}*\n\nIdentificamos a falta do(a) estudante *{NOME}* em nosso sistema de monitoramento hoje.\n\nA escola segue à disposição para qualquer dúvida.\nRef: {REF}",
+            "✅ *Relatório AcessaEdu*\n\nNotificamos que *{NOME}* não compareceu à unidade *{ESCOLA}* hoje.\n\nLembramos que as faltas podem prejudicar a aprovação final. Fique atento!\n📅 {DATA}\nRef: {REF}",
+            "📝 *Comunicado Oficial - {ESCOLA}*\n\nInformamos que o(a) aluno(a) *{NOME}* registrou falta nesta data.\n\nFavor salvar nosso contato oficial da escola para receber informativos importantes.\nRef: {REF}",
+            "💡 *Aviso Pedagógico*\n\nO(A) estudante *{NOME}* faltou hoje à aula na *{ESCOLA}*.\n\nContamos com sua parceria para manter a frequência regular.\nData: {DATA}\nRef: {REF}",
+            "🔍 *Monitoramento de Presença*\n\nUnidade escolar: *{ESCOLA}*.\nAluno(a): *{NOME}*.\nStatus: AUSENTE.\n\nPedimos que responda 'LIDO' para confirmarmos o envio.\nRef: {REF}",
+            "🎓 *Foco nos Estudos - {ESCOLA}*\n\nRegistramos a falta do(a) aluno(a) *{NOME}* hoje.\n\nNão deixe os conteúdos acumularem. Esperamos o retorno amanhã!\n📅 {DATA}\nRef: {REF}",
+            "🌈 *Boletim de Frequência Diária*\n\nSaudações. Notificamos que *{NOME}* faltou à escola *{ESCOLA}* nesta data.\n\nBusca ativa junto da família pelo sucesso do estudante.\nRef: {REF}"
         ];
 
+        /* --- LÓGICA DE ENVIO EM MASSA COM FILTRO E CORREÇÃO DE STATUS --- */
         window.dispararTurmaMassa = async (sala, idS) => {
             const dataSelStr = document.getElementById('dataFaltaDia').value;
             const dataFormatada = new Date(dataSelStr + 'T12:00:00').toLocaleDateString('pt-BR');
             const dataKey = dataFormatada.replaceAll('/', '-');
+            const escolaNome = configUnidadeGlobal.nome.toUpperCase();
+
+            // Obter log individual em tempo real para filtrar
+            const logAlunosRef = doc(db, "unidades", logado.escolaId, "log_alunos_notificados", dataKey);
+            const snapAluLog = await getDoc(logAlunosRef);
+            const enviosAlunos = snapAluLog.exists() ? snapAluLog.data() : {};
 
             const confirm = await Swal.fire({
                 title: `Enviar notificações da Turma ${sala}?`,
-                text: "As mensagens serão agendadas na API. Você poderá fechar o sistema após o início.",
+                text: "O envio será feito em segundo plano. Alunos que já foram notificados individualmente serão ignorados.",
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonText: 'INICIAR FILA',
@@ -1275,53 +1340,84 @@
 
             const listaAlunos = [];
             document.querySelectorAll(`#accF-${idS} tbody tr`).forEach(row => {
-                const nome = row.cells[0].innerText;
-                const tel = row.cells[1].innerText;
-                if (tel && tel !== '---') listaAlunos.push({ nome, tel });
+                const nome = row.cells[0].innerText.split('\n')[0].trim();
+                const tel = row.cells[1].innerText.trim();
+                const btnIndividual = row.querySelector('button.btn-outline-danger, button.btn-success');
+                if (tel && tel !== '---' && btnIndividual) {
+                    const alId = btnIndividual.getAttribute('onclick').match(/'([^']+)'/)[1];
+                    // SÓ ADICIONA SE NÃO FOI ENVIADO AINDA
+                    if (!enviosAlunos[alId]) {
+                        listaAlunos.push({ id: alId, nome, tel });
+                    }
+                }
             });
 
-            if (listaAlunos.length === 0) return Swal.fire("Atenção", "Nenhum WhatsApp encontrado.", "warning");
+            if (listaAlunos.length === 0) return Swal.fire("Aviso", "Não há mais alunos pendentes nesta turma.", "info");
 
-            Swal.fire({ title: 'Enviando para a Nuvem...', text: 'Aguarde um instante...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            isSendingBulk = true;
+            const elCounter = document.getElementById('floating-bulk-counter');
+            const elStatusTxt = document.getElementById('bulk-text-status');
+            elCounter.style.display = 'flex';
 
-            let segundosAcumulados = 5;
-            const intervalosAleatorios = [8, 12, 15, 20, 25, 30, 10, 18, 22, 14, 23, 16, 40, 13, 10, 76, 34, 90, 27];
-
-            for (let item of listaAlunos) {
-                const msg = MENSAGENS_FALTA[Math.floor(Math.random() * MENSAGENS_FALTA.length)].replace("{NOME}", item.nome.toUpperCase());
-                const momentoEnvio = new Date(Date.now() + (segundosAcumulados * 1000)).toISOString();
-                
-                await window.processarZapiAtraso(item.tel, msg, momentoEnvio);
-                
-                const proximoIntervalo = intervalosAleatorios[Math.floor(Math.random() * intervalosAleatorios.length)];
-                segundosAcumulados += proximoIntervalo;
-            }
-
-            const horaEnvio = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
             const logRef = doc(db, "unidades", logado.escolaId, "log_envio_faltas", dataKey);
-            await setDoc(logRef, { [sala]: `Fila iniciada às ${horaEnvio}` }, { merge: true });
+            await setDoc(logRef, { [sala]: `Processando...` }, { merge: true });
 
-            Swal.fire({
-                icon: 'success',
-                title: 'Fila Programada!',
-                text: `Sucesso! ${listaAlunos.length} mensagens enviadas para a fila. Você já pode fechar o site.`,
-                confirmButtonColor: '#003399'
-            });
+            const intervalosAleatorios = [15000, 18000, 22000, 25000, 30000, 33000, 37000, 40000, 42000, 45000, 48000, 52000, 55000, 58000, 60000, 63000, 65000, 68000, 70000, 72000, 75000, 78000, 80000, 23000, 35000, 47000, 51000, 66000, 28000, 39000];
             
-            window.carregarFaltasDoDia();
+            const executarFila = async (index) => {
+                if (index >= listaAlunos.length) {
+                    const horaFim = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    // FINALIZAÇÃO: Substitui o "Processando..." pela hora real no banco de dados
+                    await setDoc(logRef, { [sala]: `${horaFim}` }, { merge: true });
+                    isSendingBulk = false; elCounter.style.display = 'none';
+                    Swal.fire("Concluído!", `Turma ${sala} finalizada às ${horaFim}!`, "success");
+                    window.carregarFaltasDoDia();
+                    return;
+                }
+
+                elStatusTxt.innerText = `Enviando ${index + 1} de ${listaAlunos.length}...`;
+                const item = listaAlunos[index];
+                const ref = Math.random().toString(36).substring(2, 8).toUpperCase();
+                const msgBase = MENSAGENS_FALTA[Math.floor(Math.random() * MENSAGENS_FALTA.length)];
+                const msgFinal = msgBase.replaceAll("{NOME}", item.nome.toUpperCase()).replaceAll("{ESCOLA}", escolaNome).replaceAll("{DATA}", dataFormatada).replaceAll("{REF}", ref);
+
+                const ok = await window.processarZapiAtraso(item.tel, msgFinal);
+                if(ok) {
+                    const horaEnv = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    await setDoc(logAlunosRef, { [item.id]: horaEnv }, { merge: true });
+                }
+                
+                const proximoDelay = intervalosAleatorios[Math.floor(Math.random() * intervalosAleatorios.length)];
+                setTimeout(() => executarFila(index + 1), proximoDelay);
+            };
+
+            executarFila(0);
         };
 
-        window.notificarFaltaUnica = async (id, nome, tel) => {
+        window.notificarFaltaUnica = async (alId, nome, tel, sala) => {
             if(!tel || tel === '---') return Swal.fire("Atenção", "Sem número de WhatsApp.", "warning");
-            const msg = MENSAGENS_FALTA[Math.floor(Math.random() * MENSAGENS_FALTA.length)].replace("{NOME}", nome.toUpperCase());
+            const escolaNome = configUnidadeGlobal.nome.toUpperCase();
+            const dataFormatada = new Date().toLocaleDateString('pt-BR');
+            const dataKey = dataFormatada.replaceAll('/', '-');
+            const ref = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+            let msgBase = MENSAGENS_FALTA[Math.floor(Math.random() * MENSAGENS_FALTA.length)];
+            const msgFinal = msgBase.replaceAll("{NOME}", nome.toUpperCase()).replaceAll("{ESCOLA}", escolaNome).replaceAll("{DATA}", dataFormatada).replaceAll("{REF}", ref);
+
             Swal.fire({title: 'Enviando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+            const ok = await window.processarZapiAtraso(tel, msgFinal);
             
-            const momentoEnvio = new Date(Date.now() + 2000).toISOString();
-            const ok = await window.processarZapiAtraso(tel, msg, momentoEnvio);
-            
-            Swal.close();
-            if(ok) Swal.fire("Sucesso", "Notificação enviada!", "success");
-            else Swal.fire("Erro", "Z-API indisponível.", "error");
+            if(ok) {
+                const horaEnvio = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                const logAlunosRef = doc(db, "unidades", logado.escolaId, "log_alunos_notificados", dataKey);
+                // NOTA: Salva o log apenas do ALUNO, para não mudar o botão da sala inteira
+                await setDoc(logAlunosRef, { [alId]: horaEnvio }, { merge: true });
+                
+                Swal.fire("Sucesso", "Notificação enviada!", "success");
+                window.carregarFaltasDoDia();
+            } else {
+                Swal.fire("Erro", "Z-API indisponível.", "error");
+            }
         };
 
         window.abrirModalFalta = (id, nome) => {
@@ -1533,6 +1629,7 @@
         }
 
         window.trocarAba = (id, btn) => {
+            if(isSendingBulk) return;
             const video = document.getElementById('webcam');
             if (video && video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
             document.querySelectorAll('.secao').forEach(s => s.classList.remove('ativa'));
@@ -1624,16 +1721,47 @@
                 const snapAlunos = await getDocs(qAlunos);
                 const qFreq = query(collection(db, "frequencia"), where("escolaId", "==", logado.escolaId), where("data", "==", dataFormatada));
                 const snapFreq = await getDocs(qFreq);
+                
                 const mapaPresenca = {};
                 snapFreq.forEach(d => { mapaPresenca[d.data().nome] = d.data().hora; });
+                
                 let listaAlunosArr = [];
-                snapAlunos.forEach(d => listaAlunosArr.push(d.data()));
+                snapAlunos.forEach(d => {
+                    listaAlunosArr.push({ id: d.id, ...d.data() });
+                });
+                
                 listaAlunosArr.sort((a, b) => a.nome.localeCompare(b.nome));
+                
                 let html = "";
                 listaAlunosArr.forEach(al => {
                     const pres = mapaPresenca[al.nome];
-                    html += `<tr><td class="ps-4 fw-bold text-uppercase" style="font-size:0.85rem">${al.nome}</td><td class="text-muted" style="font-size:0.85rem">${al.sala}</td><td class="text-center"><span class="status-badge ${pres ? 'bg-success text-white' : 'bg-danger text-white'}">${pres ? 'PRESENTE' : 'FALTOU'}</span></td><td class="text-end pe-4 fw-bold text-primary">${pres || '--:--'}</td></tr>`;
+                    const jus = al.justificativasFalta || [];
+                    
+                    let statusLabel = "FALTOU";
+                    let badgeClass = "bg-danger";
+                    let horarioDisplay = "--:--";
+
+                    if(pres) {
+                        statusLabel = "PRESENTE";
+                        badgeClass = "bg-success";
+                        horarioDisplay = pres;
+                    } else if (jus.includes(dataFormatada)) {
+                        statusLabel = "JUSTIFICADO";
+                        badgeClass = "bg-info";
+                        horarioDisplay = "ABONADO";
+                    }
+
+                    html += `
+                    <tr>
+                        <td class="ps-4 fw-bold text-uppercase" style="font-size:0.85rem">${al.nome}</td>
+                        <td class="text-muted" style="font-size:0.85rem">${al.sala}</td>
+                        <td class="text-center">
+                            <span class="status-badge ${badgeClass} text-white">${statusLabel}</span>
+                        </td>
+                        <td class="text-end pe-4 fw-bold text-primary">${horarioDisplay}</td>
+                    </tr>`;
                 });
+                
                 body.innerHTML = html || '<tr><td colspan="4" class="text-center py-4">Nenhum registro encontrado.</td></tr>';
             } catch (e) { body.innerHTML = '<tr><td colspan="4">Erro ao carregar dados.</td></tr>'; }
         };
@@ -1771,7 +1899,12 @@
         window.confirmarEdicao = async () => { await updateDoc(doc(db, "alunos", document.getElementById('editId').value), { nome: document.getElementById('editNome').value, sala: document.getElementById('editSala').value, tel: document.getElementById('editTel').value, telefone: document.getElementById('editTelAluno').value }); bootstrap.Modal.getInstance(document.getElementById('modalEditAluno')).hide(); };
         
         window.del = async (c, i, n) => { if(confirm(`Excluir ${n}?`)) await deleteDoc(doc(db, c, i)); };
-        window.logout = async () => { await signOut(auth); localStorage.clear(); window.location.href = 'index.html'; };
+        window.logout = async () => { 
+            if(isSendingBulk) {
+                return Swal.fire("Atenção", "Aguarde a finalização dos envios antes de sair.", "warning");
+            }
+            await signOut(auth); localStorage.clear(); window.location.href = 'index.html'; 
+        };
 
         function updateCharts() {
             const t = parseInt(document.getElementById('st-total').innerText) || 0, p = parseInt(document.getElementById('st-presentes').innerText) || 0, f = Math.max(0, t - p);
@@ -1797,7 +1930,13 @@
                 const atrasosPorAluno = {};
                 const entradasYaProcessadas = new Set(); 
 
-                const docsOrdenados = snapFreq.docs.map(d => d.data()).sort((a,b) => a.hora.localeCompare(b.hora));
+                const docsOrdenados = snapFreq.docs.map(d => d.data()).sort((a,b) => {
+                    const d1 = a.data.split('/');
+                    const d2 = b.data.split('/');
+                    const date1 = new Date(d1[2], d1[1]-1, d1[0], a.hora.split(':')[0], a.hora.split(':')[1]);
+                    const date2 = new Date(d2[2], d2[1]-1, d2[0], b.hora.split(':')[0], b.hora.split(':')[1]);
+                    return date1 - date2;
+                });
 
                 docsOrdenados.forEach(f => {
                     const chaveUnicaDia = `${f.nome}_${f.data}`;
@@ -1832,7 +1971,8 @@
                     if (qtd >= 6 && qtd < 9 && al.reuniaoRealizada === true) continue;
 
                     const patamar = (qtd >= 9) ? 9 : (qtd >= 6 ? 6 : 3);
-                    const jaNotificado = (al.qtdAtrasoNotificada == patamar);
+                    const hoje = new Date().toLocaleDateString('pt-BR');
+                    const jaNotificado = (al.qtdAtrasoNotificada == patamar && al.ultimoEnvioAtraso == hoje);
 
                     let acaoHtml = "";
                     if (qtd >= 6 && qtd < 9 && al.dataReuniaoMarcada) {
@@ -1848,7 +1988,7 @@
                     }
 
                     const htmlHistorico = listaEventos.map(ev => `• ${ev.data} às ${ev.hora}`).join('<br>');
-                    const datasTexto = listaEventos.map(ev => ev.data).join(', ');
+                    const datasTexto = listaEventos.map(ev => `${ev.data} às ${ev.hora}`).join(', ');
 
                     const itemHtml = `
                         <div class="user-item p-3 mb-2 rounded-4 border bg-white d-flex justify-content-between align-items-center" style="order:${jaNotificado ? 1 : 0}">
@@ -2000,66 +2140,238 @@
             bootstrap.Modal.getInstance(document.getElementById('modalAgendarReuniao')).hide();
         };
 
+        const MENSAGENS_ATRASO_3 = [
+            "📑 *Aviso de Pontualidade - {ESCOLA}*\n\nPrezados responsáveis, informamos que o(a) aluno(a) *{NOME}* registrou o 3º atraso no trimestre.\n\n*Entradas registradas:*\n{HISTORICO}\n\nLembramos que o horário é vital para o rendimento escolar. Favor responder 'CIENTE'.",
+            "⏰ *CONTROLE DE HORÁRIO - {ESCOLA}*\n\nOlá, notificamos a recorrência de atrasos do estudante *{NOME}* (3 vezes).\n\n*Histórico:*\n{HISTORICO}\n\nContamos com sua ajuda para regularizar a chegada. Responda 'VERIFICADO', por favor.",
+            "🏫 *NOTIFICAÇÃO ACESSAEDU*\n\nSaudações. O(A) aluno(a) *{NOME}* atingiu 3 atrasos acumulados na unidade *{ESCOLA}*.\n\n*Datas e Horas:*\n{HISTORICO}\n\nFavor confirmar o recebimento desta mensagem enviando 'OK'.",
+            "📢 *COMUNICADO ESCOLAR*\n\nInformamos aos responsáveis por *{NOME}* que o sistema registrou 3 entradas fora do horário permitido.\n\n{HISTORICO}\n\nPara segurança e organização, pedimos pontualidade. Responda 'LIDO'.",
+            "🔔 *ALERTA DE ATRASO - {ESCOLA}*\n\nPrezados, o(a) estudante *{NOME}* já acumula 3 atrasos neste período letivo.\n\n*Registro:*\n{HISTORICO}\n\nA escola agradece a parceria. Favor responder 'CIENTE'."
+        ];
+
+        const MENSAGENS_ATRASO_9 = [
+            "🛑 *ALERTA CRÍTICO: ATRASOS RECORRENTES*\n\nUnidade: *{ESCOLA}*\nAluno(a): *{NOME}*\n\nInformamos que o limite de 9 atrasos foi atingido. Conforme regimento, o caso será enviado ao *Conselho Tutelar* para acompanhamento.\n\nFavor responder 'CIENTE' da gravidade.",
+            "⚠️ *NOTIFICAÇÃO FINAL DE ASSIDUIDADE*\n\nInformamos que *{NOME}* atingiu 9 atrasos na *{ESCOLA}*. Esgotadas as tentativas de mediação, o histórico seguirá para os órgãos competentes (Conselho Tutelar).\n\nPedimos confirmação com 'VERIFICADO'.",
+            "🚨 *MEDIDA ADMINISTRATIVA - {ESCOLA}*\n\nO(A) estudante *{NOME}* completou 9 atrasos. O relatório de faltas de pontualidade será protocolado no Conselho Tutelar nesta data.\n\nPor favor, responda 'RECEBIDO'.",
+            "🚩 *AVISO CRÍTICO - ACESSAEDU*\n\nNotificamos que *{NOME}* ultrapassou o limite tolerável de 9 atrasos. A escola iniciará o procedimento de acionamento do Conselho Tutelar conforme o ECA.\n\nFavor responder 'CIENTE'.",
+            "🛑 *COMUNICADO URGENTE - {ESCOLA}*\n\nRegistramos o 9º atraso do aluno *{NOME}*. Devido à frequência irregular, os responsáveis estão sendo notificados do encaminhamento ao Conselho Tutelar.\n\nConfirme com 'OK'."
+        ];
+
         window.enviarMensagemAtraso = async (id, nome, tel, qtd, listaDatasZapi, dataR = "", horaR = "") => {
             const hoje = new Date().toLocaleDateString('pt-BR');
-            const alunoDoc = await getDoc(doc(db, "alunos", id));
-            const dadosAlu = alunoDoc.exists() ? alunoDoc.data() : {};
-            const salaAlu = dadosAlu.sala || "---";
             const escolaNome = configUnidadeGlobal.nome.toUpperCase();
             let mensagem = "";
-            const m3 = [`*AcessaEdu | Notificação de Pontualidade* 🏫\n\nOlá, o aluno *${nome.toUpperCase()}* (${salaAlu}) atingiu o 3º atraso na escola *${escolaNome}*.\nDatas: ${listaDatasZapi}`];
-            const m6 = [`*ACESSAEDU | CONVOCAÇÃO* 🚨\n\nO aluno *${nome.toUpperCase()}* atingiu 6 atrasos. Favor comparecer à escola *${escolaNome}* no dia *${dataR}* às *${horaR}* para reunião.`];
-            const m9 = [`*ACESSAEDU | ALERTA CRÍTICO* 🛑\n\nO aluno *${nome.toUpperCase()}* atingiu 9 atrasos na escola *${escolaNome}*. Histórico enviado ao Conselho Tutelar.`];
-            if (qtd == 3) mensagem = m3[0]; else if (qtd == 6) mensagem = m6[0]; else if (qtd == 9) mensagem = m9[0];
             
-            const momentoEnvio = new Date(Date.now() + 2000).toISOString();
+            if (qtd == 3) {
+                mensagem = MENSAGENS_ATRASO_3[Math.floor(Math.random() * MENSAGENS_ATRASO_3.length)]
+                    .replaceAll("{NOME}", nome.toUpperCase())
+                    .replaceAll("{ESCOLA}", escolaNome)
+                    .replaceAll("{HISTORICO}", listaDatasZapi.replaceAll(', ', '\n'));
+            } else if (qtd == 6) {
+                mensagem = `🚨 *CONVOCAÇÃO PARA REUNIÃO - ${escolaNome}*\n\nInformamos que o(a) aluno(a) *${nome.toUpperCase()}* atingiu 6 atrasos acumulados.\n\nDiante da recorrência, convocamos o responsável para uma reunião presencial:\n📅 Data: *${dataR}*\n⏰ Horário: *${horaR}*\n\nSua presença é fundamental.\nPor favor, responda 'CONFIRMADO'.`;
+            } else if (qtd == 9) {
+                mensagem = MENSAGENS_ATRASO_9[Math.floor(Math.random() * MENSAGENS_ATRASO_9.length)]
+                    .replaceAll("{NOME}", nome.toUpperCase())
+                    .replaceAll("{ESCOLA}", escolaNome);
+            }
             
-            if (await window.processarZapiAtraso(tel, mensagem, momentoEnvio)) {
+            Swal.fire({title: 'Enviando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+            if (await window.processarZapiAtraso(tel, mensagem)) {
                 const upData = { ultimoEnvioAtraso: hoje, qtdAtrasoNotificada: qtd };
                 if(qtd === 6) { upData.dataReuniaoMarcada = dataR; upData.horaReuniaoMarcada = horaR; upData.reuniaoRealizada = false; }
                 await updateDoc(doc(db, "alunos", id), upData);
-                Swal.fire("Sucesso", "Notificação enviada e botão travado.", "success");
+                Swal.close();
+                Swal.fire("Sucesso", "Notificação enviada com sucesso!", "success");
+            } else {
+                Swal.close();
+                Swal.fire("Erro", "Falha ao enviar via Z-API.", "error");
             }
         };
 
         window.dispararNotificacoesMassaAtraso = async () => {
-            const confirm = await Swal.fire({ title: 'Disparo em Massa', text: "Notificar atrasos de hoje?", icon: 'warning', showCancelButton: true });
+            const confirm = await Swal.fire({ 
+                title: 'Disparo Automático de Atrasos', 
+                text: "Deseja notificar todos os alunos da lista (Nível 3 e 9) em segundo plano? (Nível 6 exige agendamento manual)", 
+                icon: 'warning', 
+                showCancelButton: true,
+                confirmButtonText: 'INICIAR FILA',
+                cancelButtonText: 'CANCELAR'
+            });
+
             if (confirm.isConfirmed) {
-                Swal.fire({title: 'Processando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
                 const alunosSnap = await getDocs(query(collection(db, "alunos"), where("escolaId", "==", logado.escolaId)));
                 const freqSnap = await getDocs(query(collection(db, "frequencia"), where("escolaId", "==", logado.escolaId)));
+                
                 const mapaFreq = {};
                 freqSnap.forEach(d => {
-                    const f = d.data(); const [h, m] = f.hora.split(':').map(Number);
-                    if((h*60+m) >= 466) { if(!mapaFreq[f.nome]) mapaFreq[f.nome] = new Set(); mapaFreq[f.nome].add(f.data); }
-                });
-                let totalEnviados = 0;
-                let segundosAcumulados = 5;
-                
-                for(let docAlu of alunosSnap.docs) {
-                    const al = docAlu.data(); const atrasosValidos = Array.from(mapaFreq[al.nome] || []).filter(d => !(al.justificativas || []).includes(d));
-                    const qtd = atrasosValidos.length; const patamar = (qtd >= 9) ? 9 : (qtd >= 6 ? 6 : (qtd >= 3 ? 3 : 0));
-                    
-                    if(patamar > 0 && patamar != 6 && al.qtdAtrasoNotificada != patamar && al.tel) {
-                        const momentoEnvio = new Date(Date.now() + (segundosAcumulados * 1000)).toISOString();
-                        await window.enviarMensagemAtrasoMassa(docAlu.id, al.nome, al.tel, patamar, atrasosValidos.join(', '), momentoEnvio); 
-                        totalEnviados++;
-                        segundosAcumulados += 15; 
+                    const f = d.data(); 
+                    const [h, m] = f.hora.split(':').map(Number);
+                    if((h*60+m) >= 466) { 
+                        if(!mapaFreq[f.nome]) mapaFreq[f.nome] = []; 
+                        mapaFreq[f.nome].push({data: f.data, hora: f.hora}); 
                     }
-                }
-                Swal.fire("Finalizado", `${totalEnviados} notificações programadas na fila.`, "success");
+                });
+
+                const filaMassa = [];
+                const hoje = new Date().toLocaleDateString('pt-BR');
+
+                alunosSnap.forEach(docAlu => {
+                    const al = docAlu.data();
+                    const todosAtrasos = mapaFreq[al.nome] || [];
+                    const atrasosValidos = todosAtrasos.filter(ev => !(al.justificativas || []).includes(ev.data));
+                    
+                    const qtd = atrasosValidos.length;
+                    const patamar = (qtd >= 9) ? 9 : (qtd >= 3 ? 3 : 0);
+                    
+                    if(patamar > 0 && patamar != 6 && (al.qtdAtrasoNotificada != patamar || al.ultimoEnvioAtraso != hoje) && al.tel) {
+                        const textoDatas = atrasosValidos.map(ev => `${ev.data} às ${ev.hora}`).join(', ');
+                        filaMassa.push({ id: docAlu.id, nome: al.nome, tel: al.tel, patamar, datas: textoDatas });
+                    }
+                });
+
+                if (filaMassa.length === 0) return Swal.fire("Informação", "Nenhum aluno pendente de notificação automática.", "info");
+
+                isSendingBulk = true;
+                const elCounter = document.getElementById('floating-bulk-counter');
+                const elStatusTxt = document.getElementById('bulk-text-status');
+                elCounter.style.display = 'flex';
+
+                const intervalosAleatorios = [15000, 18000, 20000, 25000, 30000, 35000, 42000, 50000, 55000, 60000];
+
+                const processarFilaAtraso = async (index) => {
+                    if (index >= filaMassa.length) {
+                        isSendingBulk = false;
+                        elCounter.style.display = 'none';
+                        Swal.fire("Finalizado", `${filaMassa.length} notificações de atraso enviadas.`, "success");
+                        return;
+                    }
+
+                    elStatusTxt.innerText = `Atrasos: ${index + 1} de ${filaMassa.length}...`;
+                    const item = filaMassa[index];
+                    const escolaNome = configUnidadeGlobal.nome.toUpperCase();
+                    let msg = "";
+
+                    if (item.patamar == 3) {
+                        msg = MENSAGENS_ATRASO_3[Math.floor(Math.random() * MENSAGENS_ATRASO_3.length)]
+                            .replaceAll("{NOME}", item.nome.toUpperCase())
+                            .replaceAll("{ESCOLA}", escolaNome)
+                            .replaceAll("{HISTORICO}", item.datas.replaceAll(', ', '\n'));
+                    } else {
+                        msg = MENSAGENS_ATRASO_9[Math.floor(Math.random() * MENSAGENS_ATRASO_9.length)]
+                            .replaceAll("{NOME}", item.nome.toUpperCase())
+                            .replaceAll("{ESCOLA}", escolaNome);
+                    }
+
+                    const ok = await window.processarZapiAtraso(item.tel, msg);
+                    if (ok) {
+                        await updateDoc(doc(db, "alunos", item.id), { ultimoEnvioAtraso: hoje, qtdAtrasoNotificada: item.patamar });
+                    }
+
+                    const delay = intervalosAleatorios[Math.floor(Math.random() * intervalosAleatorios.length)];
+                    setTimeout(() => processarFilaAtraso(index + 1), delay);
+                };
+
+                processarFilaAtraso(0);
             }
         };
 
-        window.enviarMensagemAtrasoMassa = async (id, nome, tel, qtd, listaDatasZapi, momentoEnvio) => {
-            const hoje = new Date().toLocaleDateString('pt-BR');
+        /* --- LÓGICA DE ENVIO EM MASSA COM FILTRO E CORREÇÃO DE STATUS --- */
+        window.dispararTurmaMassa = async (sala, idS) => {
+            const dataSelStr = document.getElementById('dataFaltaDia').value;
+            const dataFormatada = new Date(dataSelStr + 'T12:00:00').toLocaleDateString('pt-BR');
+            const dataKey = dataFormatada.replaceAll('/', '-');
             const escolaNome = configUnidadeGlobal.nome.toUpperCase();
-            let mensagem = "";
-            if (qtd == 3) mensagem = `*AcessaEdu | Notificação* 🏫\n\nOlá, o aluno *${nome.toUpperCase()}* atingiu o 3º atraso na escola *${escolaNome}*.\nDatas: ${listaDatasZapi}`;
-            else if (qtd == 9) mensagem = `*ACESSAEDU | ALERTA CRÍTICO* 🛑\n\nO aluno *${nome.toUpperCase()}* atingiu 9 atrasos na escola *${escolaNome}*. Histórico enviado ao Conselho Tutelar.`;
+
+            const logAlunosRef = doc(db, "unidades", logado.escolaId, "log_alunos_notificados", dataKey);
+            const snapAluLog = await getDoc(logAlunosRef);
+            const enviosAlunos = snapAluLog.exists() ? snapAluLog.data() : {};
+
+            const confirm = await Swal.fire({
+                title: `Enviar notificações da Turma ${sala}?`,
+                text: "O envio será feito em segundo plano. Alunos que já foram notificados individualmente serão ignorados.",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'INICIAR FILA',
+                cancelButtonText: 'CANCELAR'
+            });
+
+            if (!confirm.isConfirmed) return;
+
+            const listaAlunos = [];
+            document.querySelectorAll(`#accF-${idS} tbody tr`).forEach(row => {
+                const nome = row.cells[0].innerText.split('\n')[0].trim();
+                const tel = row.cells[1].innerText.trim();
+                const btnIndividual = row.querySelector('button.btn-outline-danger, button.btn-success');
+                if (tel && tel !== '---' && btnIndividual) {
+                    const alId = btnIndividual.getAttribute('onclick').match(/'([^']+)'/)[1];
+                    if (!enviosAlunos[alId]) {
+                        listaAlunos.push({ id: alId, nome, tel });
+                    }
+                }
+            });
+
+            if (listaAlunos.length === 0) return Swal.fire("Aviso", "Não há mais alunos pendentes nesta turma.", "info");
+
+            isSendingBulk = true;
+            const elCounter = document.getElementById('floating-bulk-counter');
+            const elStatusTxt = document.getElementById('bulk-text-status');
+            elCounter.style.display = 'flex';
+
+            const logRef = doc(db, "unidades", logado.escolaId, "log_envio_faltas", dataKey);
+            await setDoc(logRef, { [sala]: `Processando...` }, { merge: true });
+
+            const intervalosAleatorios = [15000, 18000, 22000, 25000, 30000, 33000, 37000, 40000, 42000, 45000, 48000, 52000, 55000, 58000, 60000, 63000, 65000, 68000, 70000, 72000, 75000, 78000, 80000, 23000, 35000, 47000, 51000, 66000, 28000, 39000];
             
-            if (await window.processarZapiAtraso(tel, mensagem, momentoEnvio)) {
-                await updateDoc(doc(db, "alunos", id), { ultimoEnvioAtraso: hoje, qtdAtrasoNotificada: qtd });
+            const executarFila = async (index) => {
+                if (index >= listaAlunos.length) {
+                    const horaFim = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    await setDoc(logRef, { [sala]: `${horaFim}` }, { merge: true });
+                    isSendingBulk = false; elCounter.style.display = 'none';
+                    Swal.fire("Concluído!", `Turma ${sala} finalizada às ${horaFim}!`, "success");
+                    window.carregarFaltasDoDia();
+                    return;
+                }
+
+                elStatusTxt.innerText = `Enviando ${index + 1} de ${listaAlunos.length}...`;
+                const item = listaAlunos[index];
+                const ref = Math.random().toString(36).substring(2, 8).toUpperCase();
+                const msgBase = MENSAGENS_FALTA[Math.floor(Math.random() * MENSAGENS_FALTA.length)];
+                const msgFinal = msgBase.replaceAll("{NOME}", item.nome.toUpperCase()).replaceAll("{ESCOLA}", escolaNome).replaceAll("{DATA}", dataFormatada).replaceAll("{REF}", ref);
+
+                const ok = await window.processarZapiAtraso(item.tel, msgFinal);
+                if(ok) {
+                    const horaEnv = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    await setDoc(logAlunosRef, { [item.id]: horaEnv }, { merge: true });
+                }
+                
+                const proximoDelay = intervalosAleatorios[Math.floor(Math.random() * intervalosAleatorios.length)];
+                setTimeout(() => executarFila(index + 1), proximoDelay);
+            };
+
+            executarFila(0);
+        };
+
+        window.notificarFaltaUnica = async (alId, nome, tel, sala) => {
+            if(!tel || tel === '---') return Swal.fire("Atenção", "Sem número de WhatsApp.", "warning");
+            const escolaNome = configUnidadeGlobal.nome.toUpperCase();
+            const dataFormatada = new Date().toLocaleDateString('pt-BR');
+            const dataKey = dataFormatada.replaceAll('/', '-');
+            const ref = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+            let msgBase = MENSAGENS_FALTA[Math.floor(Math.random() * MENSAGENS_FALTA.length)];
+            const msgFinal = msgBase.replaceAll("{NOME}", nome.toUpperCase()).replaceAll("{ESCOLA}", escolaNome).replaceAll("{DATA}", dataFormatada).replaceAll("{REF}", ref);
+
+            Swal.fire({title: 'Enviando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+            const ok = await window.processarZapiAtraso(tel, msgFinal);
+            
+            if(ok) {
+                const horaEnvio = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                const logAlunosRef = doc(db, "unidades", logado.escolaId, "log_alunos_notificados", dataKey);
+                await setDoc(logAlunosRef, { [alId]: horaEnvio }, { merge: true });
+                
+                Swal.fire("Sucesso", "Notificação enviada!", "success");
+                window.carregarFaltasDoDia();
+            } else {
+                Swal.fire("Erro", "Z-API indisponível.", "error");
             }
         };
 
