@@ -63,9 +63,12 @@
         let configEscola = null;
         let ultimoDelayUtilizado = null;
 
-        // VARIÁVEIS NOVAS INTEGRADAS PARA O SISTEMA DE CONTROLE DE ESTABILIDADE
         let contadorEstabilidade = 0;
         let labelTemporariaAnterior = "";
+
+        // ACRESCENTADO: Estrutura de Fila Global para processamento síncrono da Z-API
+        const filaDeMensagens = [];
+        let filaProcessando = false;
 
         onAuthStateChanged(auth, (user) => {
             if (user) carregarConfiguracoes();
@@ -87,7 +90,6 @@
         async function initTerminal() {
             try {
                 const URL_MODELS = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
-                // ACRESCENTADO: Carregamento do modelo de alta resolução estrutural para evitar mistura de identidades
                 await faceapi.nets.ssdMobilenetv1.loadFromUri(URL_MODELS);
                 await faceapi.nets.tinyFaceDetector.loadFromUri(URL_MODELS);
                 await faceapi.nets.faceLandmark68Net.loadFromUri(URL_MODELS);
@@ -107,16 +109,13 @@
                     }
                 });
 
-                // ALTERADO APENAS O LIMIAR: Reduzido para 0.38 para criar máxima intolerância contra falsos positivos
                 const faceMatcher = new faceapi.FaceMatcher(labledDescriptors, 0.38); 
 
-                // Ajustado ciclo para 500ms para gerenciar as checagens consecutivas de estabilidade perfeitamente
                 setInterval(async () => {
                     if(isProcessing) return;
                     const video = document.getElementById('video');
                     const molduraEl = document.getElementById('moldura');
                     
-                    // ALTERADO DETECTOR: Usando SsdMobilenetv1 com minConfidence em 0.75 para máxima segurança analítica
                     const detection = await faceapi.detectSingleFace(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.75 })).withFaceLandmarks().withFaceDescriptor();
                     
                     if(detection) {
@@ -137,14 +136,11 @@
                             if(match.label !== 'unknown') {
                                 const nome = match.label;
                                 
-                                // LOGICA DE ESTABILIDADE INTEGRADA (3 Segundos Fixo)
                                 if (nome === labelTemporariaAnterior) {
                                     contadorEstabilidade++;
                                     
-                                    // Feedback em tempo real na tela do terminal
                                     document.getElementById('display').innerHTML = `<p class="fs-5 fw-bold mt-3 text-warning">Analisando... Fique parado (${Math.round((contadorEstabilidade / 5) * 100)}%)</p>`;
                                     
-                                    // 5 a 6 loops estáveis a 500ms totalizam o tempo necessário de travamento firme
                                     if (contadorEstabilidade >= 5) {
                                         const agora = Date.now();
                                         if(nome === ultimoNomeDetectado && (agora - tempoUltimaDeteccao) < 30000) {
@@ -210,7 +206,11 @@
                 if (estaAtrasado) {
                     document.getElementById('display').innerHTML = `<div class="card-atraso"><h2>ENTRADA COM ATRASO</h2><p>${nome.toUpperCase()}<br>Horário: ${horaAtual}</p></div>`;
                     if (configEscola.mensagensAtActive || configEscola.mensagensAtivas) {
-                        if (info.telResp) enviarZapiAtraso(info.telResp, nome, horaAtual);
+                        // MODIFICADO: Em vez de disparar solto, o objeto com os dados vai para o final do Array da fila
+                        if (info.telResp) {
+                            filaDeMensagens.push({ telefone: info.telResp, alunoNome: nome, hora: horaAtual });
+                            processarProximaDaFila(); // Aciona a esteira de envios
+                        }
                     }
                 } else {
                     document.getElementById('display').innerHTML = `<div class="card-aluno"><h2>BEM-VINDO(A)</h2><p>${nome.toUpperCase()}</p></div>`;
@@ -221,100 +221,134 @@
             setTimeout(resetDisplay, 3000);
         }
 
-        async function enviarZapiAtraso(telefone, alunoNome, hora) {
-            if (!configEscola.zapiApi || !configEscola.zapiInstance || !configEscola.zapiToken) return;
+        // ACRESCENTADO: Gerenciador Assíncrono Sequencial da Fila (Garante a ordem cronológica exata de delays)
+        async function processarProximaDaFila() {
+            if (filaProcessando || filaDeMensagens.length === 0) return;
+            filaProcessando = true;
 
-            const nomeU = alunoNome.toUpperCase();
-            const schoolRaw = configEscola.nome || logado.escolaId;
-            const escoU = schoolRaw.toUpperCase();
-            const dataHoje = new Date().toLocaleDateString('pt-BR');
-            const registroId = Math.random().toString(36).substring(7).toUpperCase();
+            // Retira o elemento mais antigo da ponta da fila
+            const tarefaAtual = filaDeMensagens.shift();
 
-            // ACRESCENTADO: Conjunto estendido e robusto de templates de mensagens dinâmicas
-            const saudacoes = [
-                "AcessaEdu | Alerta de Entrada Tardia",
-                "⚠️ NOTIFICAÇÃO IMPORTANTE - PONTUALIDADE",
-                "🏫 Informativo de Frequência - " + escoU + "",
-                "🔔 COMUNICADO DE ENTRADA NA ESCOLA",
-                "📍 AcessaEdu | Controle de Acesso",
-                "👋 Olá, Bom Dia | Comunicado de Entrada Escolar!",
-                "📚 *AcessaEdu | Acompanhamento Escolar*",
-                "🚸 *Alerta de Frequência Escolar*",
-                "📢 *Comunicado Automático de Presença*",
-                "🏫 *Monitoramento de Entrada - " + escoU + "*",
-                "🌞 *Bom Dia! Atualização de Frequência Escolar*",
-                "📋 *Registro de Frequência Escolar*",
-                "⏰ *Alerta de Horário de Entrada*",
-                "🎓 *Comunicado aos Responsáveis*",
-                "📲 *AcessaEdu | Notificação de Acesso*",
-                "🚪 *Controle de Entrada Escolar*"
-            ];
+            // Executa a função e espera ela terminar 100% (incluindo o tempo de delay) antes de liberar a próxima
+            await executarEnvioZapi(tarefaAtual.telefone, tarefaAtual.alunoNome, tarefaAtual.hora);
 
-            const corpos = [
-                `Prezados responsáveis, comunicamos que o(a) aluno(a) *${nomeU}* deu entrada na unidade *${escoU}* apresentando atraso em relação ao horário oficial.\n\n📅 Data: ${dataHoje}\n⏰ Horário Registrado: ${hora}`,
-                `Informamos que registramos em nosso systema a entrada do(a) estudante *${nomeU}* após o horário regulamentar de início das aulas.\n\n📅 Dia: ${dataHoje}\n⌚ Entrada às: ${hora}`,
-                `Notificamos que o(a) aluno(a) *${nomeU}* apresentou-se hoje na instituição com atraso verificado pela nossa portaria digital.\n\n🏫 Unidade: *${escoU}*\n⏰ Horário de Chegada: ${hora}`,
-                `Aviso Pedagógico: Identificamos que *${nomeU}* ultrapassou a tolerância permitida para a entrada letiva na data de hoje.\n\n📅 Data do registro: ${dataHoje}\n⌚ Horário exato: ${hora}`,
-                `Prezados responsáveis, o sistema registrou a entrada do(a) estudante *${nomeU}* após o horário previsto para início das atividades escolares.\n\n📅 Data: ${dataHoje}\n⏰ Horário registrado: ${hora}`,
-                `Comunicamos que o(a) aluno(a) *${nomeU}* acessou as dependências da escola em horário posterior ao estabelecido para entrada.\n\n🏫 Unidade: *${escoU}*\n⌚ Horário de acesso: ${hora}`,
-                `Nosso controle de acesso identificou que *${nomeU}* realizou o registro de entrada com atraso nesta data.\n\n📅 Registro: ${dataHoje}\n⏰ Entrada efetuada às: ${hora}`,
-                `Informação importante aos responsáveis: o(a) estudante *${nomeU}* chegou à unidade escolar após o início regular das aulas.\n\n🏫 Escola: *${escoU}*\n⌚ Horário de chegada: ${hora}`,
-                `Através do sistema de monitoramento escolar, registramos a entrada tardia de *${nomeU}* nesta data.\n\n📅 Data: ${dataHoje}\n⏰ Horário confirmed: ${hora}`,
-                `Registramos em nossa plataforma que o(a) aluno(a) *${nomeU}* ingressou na unidade escolar após o horário habitual de início das atividades.\n\n📅 Data: ${dataHoje}\n⏰ Entrada registrada: ${hora}`,
-                `Comunicado automático: foi identificada a chegada de *${nomeU}* em horário posterior ao previsto para o início das aulas.\n\n🏫 Unidade: *${escoU}*\n⌚ Horário: ${hora}`,
-                `O sistema AcessaEdu registrou a entrada de *${nomeU}* com atraso nesta data.\n\n📅 ${dataHoje}\n⏰ Horário de acesso: ${hora}`,
-                `Informamos aos responsáveis que *${nomeU}* teve sua presença registrada após o horário regular de entrada da instituição.\n\n🏫 Escola: *${escoU}*\n⌚ Registro: ${hora}`,
-                `Notificação de frequência: a entrada do(a) estudante *${nomeU}* ocorreu fora do horário previsto para início das atividades escolares.\n\n📅 Data: ${dataHoje}\n⏰ Horário registrado: ${hora}`
-            ];
+            filaProcessando = false;
+            processarProximaDaFila(); // Chama recursivamente para a próxima mensagem
+        }
 
-            const fechamentos = [
-                "⚠️ ATENÇÃO: Salve nosso número na sua agenda para continuar recebendo os relatórios diários de frequência e responda esta mensagem com 'CIENTE'.",
-                "💡 *IMPORTANTE:* Para evitar que o WhatsApp bloqueie nossos envios automáticos, *salve este contato* nos seus favoritos e responda com um *'OK'*.",
-                "📝 Pedimos que *salve este número oficial da escola* nos seus contatos e confirme o recebimento respondendo apenas *'RECEBIDO'*.",
-                "🔒 Mantenha este canal ativo! *Adicione nosso número à sua lista de contatos* e valide esta notificação respondendo com *'VERIFICADO'*.",
-                "✅ Para garantir o recebimento contínuo das notificações escolares, adicione este número aos seus contatos e responda com *'CIENTE'*.",
-                "📲 Salve este contato como canal oficial da escola e confirme esta comunicação respondendo com *'OK RECEBIDO'*.",
-                "🔔 Este número é utilizado para avisos importantes sobre frequência e acesso escolar. Salve-o e responda com *'CONFIRMADO'*.",
-                "📌 Recomendamos adicionar este contato à sua agenda para evitar perda de futuras notificações. Responda com *'RECEBIDO'* para validar o canal.",
-                "🤝 Sua confirmação é importante. Salve este número em seus contatos e responda com *'CIENTE E RECEBIDO'* para concluir o cadastro deste canal.",
-                "📢 Para continuar recebendo comunicados automáticos da escola, adicione este número aos seus contatos e responda com *'OK'*.",
-                "✅ Confirme o recebimento desta notificação respondendo *'CIENTE'* and mantenha este número salvo em sua agenda.",
-                "📱 Salve este contato para receber futuras informações acadêmicas e responda com *'CONFIRMADO'*.",
-                "🔐 Este é um canal oficial de comunicação escolar. Adicione-o à sua agenda e responda com *'RECEBIDO E CIENTE'*.",
-                "📬 Ajude-nos a manter a comunicação active: salve este número e responda com *'VERIFICADO'* para confirmar o recebimento."
-            ];
+        // ALTERADA: Função isolada e encapsulada com Promise para segurar a execução e garantir a ordenação linear
+        function executarEnvioZapi(telefone, alunoNome, hora) {
+            return new Promise(async (resolve) => {
+                if (!configEscola.zapiApi || !configEscola.zapiInstance || !configEscola.zapiToken) {
+                    resolve();
+                    return;
+                }
 
-            const s = saudacoes[Math.floor(Math.random() * saudacoes.length)];
-            const c = corpos[Math.floor(Math.random() * corpos.length)];
-            const f = fechamentos[Math.floor(Math.random() * fechamentos.length)];
-            
-            const msgFinal = `${s}\n\n${c}\n\n${f}\n\n*${escoU}* sempre avançando, sempre junto!\n_Busca ativa junto da família._\n\n✅ Notificação AcessaEdu\n_Ref: ${registroId}_`;
+                const nomeU = alunoNome.toUpperCase();
+                const schoolRaw = configEscola.nome || logado.escolaId;
+                const escoU = schoolRaw.toUpperCase();
+                const dataHoje = new Date().toLocaleDateString('pt-BR');
+                const registroId = Math.random().toString(36).substring(7).toUpperCase();
 
-            // ACRESCENTADO: Conjunto expandido de delays randômicos anti-ban e controle anti-repetição consecutivo
-            const temposAleatorios = [15, 22, 29, 36, 44, 52, 61, 69, 78, 86, 95, 103, 112, 120, 131, 140, 30, 41, 10, 5, 80, 24, 34, 27, 40, 62, 68, 81, 120, 129, 100, 108, 169, 187, 56, 84, 66, 95, 187, 146, 178, 200, 205, 45, 76, 54, 98];
-            let delayEscolhido;
-            
-            do {
-                delayEscolhido = temposAleatorios[Math.floor(Math.random() * temposAleatorios.length)];
-            } while (delayEscolhido === ultimoDelayUtilizado);
-            
-            ultimoDelayUtilizado = delayEscolhido; 
+                const saudacoes = [
+                    "AcessaEdu | Alerta de Entrada Tardia",
+                    "⚠️ NOTIFICAÇÃO IMPORTANTE - PONTUALIDADE",
+                    "🏫 Informativo de Frequência - " + escoU + "",
+                    "🔔 COMUNICADO DE ENTRADA NA ESCOLA",
+                    "📍 AcessaEdu | Controle de Acesso",
+                    "👋 Olá, Bom Dia | Comunicado de Entrada Escolar!",
+                    "📚 *AcessaEdu | Acompanhamento Escolar*",
+                    "🚸 *Alerta de Frequência Escolar*",
+                    "📢 *Comunicado Automático de Presença*",
+                    "🏫 *Monitoramento de Entrada - " + escoU + "*",
+                    "🌞 *Bom Dia! Atualização de Frequência Escolar*",
+                    "📋 *Registro de Frequência Escolar*",
+                    "⏰ *Alerta de Horário de Entrada*",
+                    "🎓 *Comunicado aos Responsáveis*",
+                    "📲 *AcessaEdu | Notificação de Acesso*",
+                    "🚪 *Controle de Entrada Escolar*"
+                ];
 
-            let num = "55" + telefone.replace(/\D/g, '').replace(/^55/, '');
-            if (num.length === 13) num = num.substring(0, 4) + num.substring(5);
+                const corpos = [
+                    `Prezados responsáveis, comunicamos que o(a) aluno(a) *${nomeU}* deu entrada na unidade *${escoU}* apresentando atraso em relação ao horário oficial.\n\n📅 Data: ${dataHoje}\n⏰ Horário Registrado: ${hora}`,
+                    `Informamos que registramos em nosso sistema a entrada do(a) estudante *${nomeU}* após o horário regulamentar de início das aulas.\n\n📅 Dia: ${dataHoje}\n⌚ Entrada às: ${hora}`,
+                    `Notificamos que o(a) aluno(a) *${nomeU}* apresentou-se hoje na instituição com atraso verificado pela nossa portaria digital.\n\n🏫 Unidade: *${escoU}*\n⏰ Horário de Chegada: ${hora}`,
+                    `Aviso Pedagógico: Identificamos que *${nomeU}* ultrapassou a tolerância permitida para a entrada letiva na data de hoje.\n\n📅 Data do registro: ${dataHoje}\n⌚ Horário exato: ${hora}`,
+                    `Prezados responsáveis, o sistema registrou a entrada do(a) estudante *${nomeU}* após o horário previsto para início das atividades escolares.\n\n📅 Data: ${dataHoje}\n⏰ Horário registrado: ${hora}`,
+                    `Comunicamos que o(a) aluno(a) *${nomeU}* acessou as dependências da escola in horário posterior ao estabelecido para entrada.\n\n🏫 Unidade: *${escoU}*\n⌚ Horário de acesso: ${hora}`,
+                    `Nosso controle de acesso identificou que *${nomeU}* realizou o registro de entrada com atraso nesta data.\n\n📅 Registro: ${dataHoje}\n⏰ Entrada efetuada às: ${hora}`,
+                    `Informação importante aos responsáveis: o(a) estudante *${nomeU}* chegou à unidade escolar após o início regular das aulas.\n\n🏫 Escola: *${escoU}*\n⌚ Horário de chegada: ${hora}`,
+                    `Através do sistema de monitoramento escolar, registramos a entrada tardia de *${nomeU}* nesta data.\n\n📅 Data: ${dataHoje}\n⏰ Horário confirmed: ${hora}`,
+                    `Registramos em nossa plataforma que o(a) aluno(a) *${nomeU}* ingressou na unidade escolar após o horário habitual de início das atividades.\n\n📅 Data: ${dataHoje}\n⏰ Entrada registrada: ${hora}`,
+                    `Comunicado automático: foi identificada a chegada de *${nomeU}* em horário posterior ao previsto para o início das aulas.\n\n🏫 Unidade: *${escoU}*\n⌚ Horário: ${hora}`,
+                    `O sistema AcessaEdu registrou a entrada de *${nomeU}* com atraso nesta data.\n\n📅 ${dataHoje}\n⏰ Horário de acesso: ${hora}`,
+                    `Informamos aos responsáveis que *${nomeU}* teve sua presença registrada após o horário regular de entrada da instituição.\n\n🏫 Escola: *${escoU}*\n⌚ Registro: ${hora}`,
+                    `Notificação de frequência: a entrada do(a) estudante *${nomeU}* ocorreu fora do horário previsto para início das atividades escolares.\n\n📅 Data: ${dataHoje}\n⏰ Horário registrado: ${hora}`
+                ];
 
-            try {
-                let baseUrl = configEscola.zapiApi.trim();
-                if(baseUrl.includes('/instances/')) { baseUrl = baseUrl.split('/instances/')[0]; }
-                baseUrl = baseUrl.replace(/\/+$/, "");
-                const endpoint = `${baseUrl}/instances/${configEscola.zapiInstance}/token/${configEscola.zapiToken}/send-text`;
+                const fechamentos = [
+                    "⚠️ ATENÇÃO: Salve nosso número na sua agenda para continuar recebendo os relatórios diários de frequência e responda esta mensagem com 'CIENTE'.",
+                    "💡 *IMPORTANTE:* Para evitar que o WhatsApp bloqueie nossos envios automáticos, *salve este contato* nos seus favoritos e responda com um *'OK'*.",
+                    "📝 Pedimos que *salve este número oficial da escola* nos seus contatos e confirme o recebimento respondendo apenas *'RECEBIDO'*.",
+                    "🔒 Mantenha este canal ativo! *Adicione nosso número à sua lista de contatos* e valide esta notificação respondendo com *'VERIFICADO'*.",
+                    "✅ Para garantir o recebimento contínuo das notificações escolares, adicione este número aos seus contatos e responda com *'CIENTE'*.",
+                    "📲 Salve este contato como canal oficial da escola e confirme esta comunicação respondendo com *'OK RECEBIDO'*.",
+                    "🔔 Este número é utilizado para avisos importantes sobre frequência e acesso escolar. Salve-o e responda com *'CONFIRMADO'*.",
+                    "📌 Recomendamos adicionar este contato à sua agenda para evitar perda de futuras notificações. Responda com *'RECEBIDO'* para validar o canal.",
+                    "🤝 Sua confirmação é importante. Salve este número em seus contatos e responda com *'CIENTE E RECEBIDO'* para concluir o cadastro deste canal.",
+                    "📢 Para continuar recebendo comunicados automáticos da escola, adicione este número aos seus contatos e responda com *'OK'*.",
+                    "✅ Confirme o recebimento desta notificação respondendo *'CIENTE'* and mantenha este número salvo em sua agenda.",
+                    "📱 Salve este contato para receber futuras informações acadêmicas e responda com *'CONFIRMADO'*.",
+                    "🔐 Este é um canal oficial de comunicação escolar. Adicione-o à sua agenda e responda com *'RECEBIDO E CIENTE'*.",
+                    "📬 Ajude-nos a manter a comunicação active: salve este número e responda com *'VERIFICADO'* para confirmar o recebimento."
+                ];
+
+                const s = saudacoes[Math.floor(Math.random() * saudacoes.length)];
+                const c = corpos[Math.floor(Math.random() * corpos.length)];
+                const f = fechamentos[Math.floor(Math.random() * fechamentos.length)];
                 
-                fetch(endpoint, { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json', ...(configEscola.zapiSecurity && { 'Client-Token': configEscola.zapiSecurity }) }, 
-                    body: JSON.stringify({ phone: num, message: msgFinal, delayMessage: delayEscolhido, delayTyping: 4 }) 
-                }).then(r => console.log(`Envio: ${registroId} | Status: ${r.status} | Delay anti-ban: ${delayEscolhido}s`));
-            } catch (e) { console.error("Erro Z-API:", e); }
+                const msgFinal = `${s}\n\n${c}\n\n${f}\n\n*${escoU}* sempre avançando, sempre junto!\n_Busca ativa junto da família._\n\n✅ Notificação AcessaEdu\n_Ref: ${registroId}_`;
+
+                // INTEGRADO: Sua lista estendida e personalizada de delays atualizada
+                const temposAleatorios = [45, 10, 29, 43, 14, 76, 87, 80, 89, 42, 78, 97, 44, 32, 21, 31, 56, 10, 20, 22, 25, 18, 45, 70, 98, 12, 86, 60, 75, 90, 105, 100, 180];
+                let delayEscolhido;
+                
+                do {
+                    delayEscolhido = temposAleatorios[Math.floor(Math.random() * temposAleatorios.length)];
+                } while (delayEscolhido === ultimoDelayUtilizado);
+                
+                ultimoDelayUtilizado = delayEscolhido; 
+
+                let num = "55" + telefone.replace(/\D/g, '').replace(/^55/, '');
+                if (num.length === 13) num = num.substring(0, 4) + num.substring(5);
+
+                console.log(`Fila Sequencial | Iniciando contagem de delay isolado para ${nomeU}: ${delayEscolhido} segundos...`);
+                
+                // Realiza a parada obrigatória e linear do fluxo de código
+                setTimeout(() => {
+                    try {
+                        let baseUrl = configEscola.zapiApi.trim();
+                        if(baseUrl.includes('/instances/')) { baseUrl = baseUrl.split('/instances/')[0]; }
+                        baseUrl = baseUrl.replace(/\/+$/, "");
+                        const endpoint = `${baseUrl}/instances/${configEscola.zapiInstance}/token/${configEscola.zapiToken}/send-text`;
+                        
+                        fetch(endpoint, { 
+                            method: 'POST', 
+                            headers: { 'Content-Type': 'application/json', ...(configEscola.zapiSecurity && { 'Client-Token': configEscola.zapiSecurity }) }, 
+                            body: JSON.stringify({ phone: num, message: msgFinal, delayMessage: 0, delayTyping: 8 }) 
+                        }).then(r => {
+                            console.log(`Fila Sequencial | Envio Realizado: ${registroId} do aluno ${nomeU}. Próximo da fila liberado.`);
+                            resolve(); // Libera o Promise permitindo o avanço do fluxo para o próximo da fila
+                        }).catch(err => {
+                            console.error(err);
+                            resolve(); // Libera em caso de falha de rede para não travar os próximos
+                        });
+                    } catch (e) { 
+                        console.error("Erro Z-API:", e); 
+                        resolve(); 
+                    }
+                }, delayEscolhido * 1000);
+            });
         }
 
         function resetDisplay() {
