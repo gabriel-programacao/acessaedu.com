@@ -26,7 +26,6 @@
         .card-bloqueio { background: var(--pe-red); color: white; padding: 15px; border-radius: 20px; animation: shake 0.5s ease-in-out; }
         .btn-voltar { position: fixed; top: 20px; left: 20px; background: rgba(255,255,255,0.2); color: white; border-radius: 30px; padding: 8px 20px; text-decoration: none; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.3); z-index: 100; }
         
-        /* Estilo do novo Badge indicador de Fila adicionado no topo direito */
         .badge-fila { position: absolute; top: 20px; right: 20px; background: rgba(0, 0, 0, 0.4); color: #fff; padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; border: 1px solid rgba(255, 255, 255, 0.15); font-weight: 500; display: none; backdrop-filter: blur(5px); z-index: 90; }
         
         @keyframes popIn { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
@@ -54,7 +53,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, getDocs, getDoc, doc, addDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, getDoc, doc, addDoc, updateDoc, query, where, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
         const firebaseConfig = { apiKey: "AIzaSyDgR98RtL8sgxVbEV2Swyb2wnHLSPt3cDo", authDomain: "escolapro-15e5e.firebaseapp.com", projectId: "escolapro-15e5e", storageBucket: "escolapro-15e5e.firebasestorage.app", messagingSenderId: "339019791514", appId: "1:339019791514:web:44e0d58b6835f0fe6df323" };
@@ -72,8 +71,9 @@
         let contadorEstabilidade = 0;
         let labelTemporariaAnterior = "";
 
-        const filaDeMensagens = [];
-        let filaProcessando = false;
+        const terminalId = "TERM_" + Math.random().toString(36).substring(2, 9).toUpperCase();
+        let loopFilaAtivo = false;
+        let totalPendentesNoBanco = 0;
 
         onAuthStateChanged(auth, (user) => {
             if (user) carregarConfiguracoes();
@@ -88,6 +88,11 @@
                 if(snap.exists()) {
                     configEscola = snap.data();
                     initTerminal();
+
+                    if (!loopFilaAtivo) {
+                        loopFilaAtivo = true;
+                        processarFilaDoBanco();
+                    }
                 }
             } catch (e) { console.error(e); }
         }
@@ -114,7 +119,7 @@
                     }
                 });
 
-                // ALTERADO: Reduzido o rigor sutilmente de 0.38 para 0.42 equilibrando aceitação biométrica e proteção
+                // ALTERADO: Reduzido o rigor sutilmente de 0.38 para 0.42 equilibrando aceitação biométrica e proteção.
                 const faceMatcher = new faceapi.FaceMatcher(labledDescriptors, 0.42); 
 
                 setInterval(async () => {
@@ -213,12 +218,16 @@
                     document.getElementById('display').innerHTML = `<div class="card-atraso"><h2>ENTRADA COM ATRASO</h2><p>${nome.toUpperCase()}<br>Horário: ${horaAtual}</p></div>`;
                     if (configEscola.mensagensAtActive || configEscola.mensagensAtivas) {
                         if (info.telResp) {
-                            filaDeMensagens.push({ telefone: info.telResp, alunoNome: nome, hora: horaAtual });
-                            
-                            // ACRESCENTADO: Atualiza e exibe o contador na tela sempre que entra uma nova mensagem
-                            atualizarPainelFila();
-                            
-                            processarProximaDaFila(); 
+                            await addDoc(collection(db, "fila_whatsapp"), {
+                                telefone: info.telResp,
+                                alunoNome: nome,
+                                hora: horaAtual,
+                                escolaId: logado.escolaId,
+                                status: "pendente",
+                                terminalOrigem: terminalId,
+                                dataCriacao: serverTimestamp()
+                            });
+                            atualizarContadorVisualFila();
                         }
                     }
                 } else {
@@ -230,39 +239,81 @@
             setTimeout(resetDisplay, 3000);
         }
 
-        // ACRESCENTADO: Função interna auxiliar para gerenciar a visibilidade do painel numérico de contagem
-        function atualizarPainelFila() {
-            const painel = document.getElementById('statusFila');
-            const contador = document.getElementById('contadorFila');
-            const total = filaDeMensagens.length;
+        async function atualizarContadorVisualFila() {
+            try {
+                const qContador = query(
+                    collection(db, "fila_whatsapp"),
+                    where("escolaId", "==", logado.escolaId),
+                    where("status", "in", ["pendente", "enviando"])
+                );
+                const snap = await getDocs(qContador);
+                totalPendentesNoBanco = snap.size;
 
-            if (total > 0 || filaProcessando) {
-                // Soma 1 no contador de tarefas pendentes caso o processo de envio atual esteja ativo
-                const exibicaoTotal = total + (filaProcessando ? 1 : 0);
-                contador.innerText = exibicaoTotal;
-                painel.style.display = "block";
-            } else {
-                painel.style.display = "none";
-            }
+                const painel = document.getElementById('statusFila');
+                const contadorText = document.getElementById('contadorFila');
+
+                if (totalPendentesNoBanco > 0) {
+                    contadorText.innerText = totalPendentesNoBanco;
+                    painel.style.display = "block";
+                } else {
+                    painel.style.display = "none";
+                }
+            } catch (e) { console.error(e); }
         }
 
-        async function processarProximaDaFila() {
-            if (filaProcessando || filaDeMensagens.length === 0) return;
-            filaProcessando = true;
+        async function processarFilaDoBanco() {
+            while (loopFilaAtivo) {
+                if (!configEscola) {
+                    await new Promise(r => setTimeout(r, 2000));
+                    continue;
+                }
 
-            const tarefaAtual = filaDeMensagens.shift();
-            
-            // Atualiza o painel quando a mensagem sai da fila e entra em processamento ativo
-            atualizarPainelFila();
+                try {
+                    await atualizarContadorVisualFila();
 
-            await executarEnvioZapi(tarefaAtual.telefone, tarefaAtual.alunoNome, tarefaAtual.hora);
-
-            filaProcessando = false;
-            
-            // Atualiza novamente após a conclusão do envio
-            atualizarPainelFila();
-            
-            processarProximaDaFila(); 
+                    let qFila = query(
+                        collection(db, "fila_whatsapp"), 
+                        where("escolaId", "==", logado.escolaId),
+                        where("status", "in", ["pendente", "enviando"]),
+                        where("terminalOrigem", "==", terminalId),
+                        orderBy("dataCriacao", "asc"),
+                        limit(1)
+                    );
+                    
+                    let snapshot = await getDocs(qFila);
+                    
+                    if (snapshot.empty) {
+                        qFila = query(
+                            collection(db, "fila_whatsapp"), 
+                            where("escolaId", "==", logado.escolaId),
+                            where("status", "in", ["pendente", "enviando"]),
+                            orderBy("dataCriacao", "asc"),
+                            limit(1)
+                        );
+                        snapshot = await getDocs(qFila);
+                    }
+                    
+                    if (!snapshot.empty) {
+                        const documentoFila = snapshot.docs[0];
+                        const dadosTarefa = documentoFila.data();
+                        const docRefTarefa = doc(db, "fila_whatsapp", documentoFila.id);
+                        
+                        await updateDoc(docRefTarefa, { 
+                            status: "enviando",
+                            terminalProcessador: terminalId
+                        });
+                        await atualizarContadorVisualFila();
+                        
+                        await executarEnvioZapi(dadosTarefa.telefone, dadosTarefa.alunoNome, dadosTarefa.hora);
+                        
+                        await updateDoc(docRefTarefa, { status: "concluido", dataEnvio: serverTimestamp() });
+                    }
+                } catch (error) {
+                    console.error("Erro no processamento multi-terminal distribuído:", error);
+                }
+                
+                await new Promise(r => setTimeout(r, 2000));
+            }
         }
 
         function executarEnvioZapi(telefone, alunoNome, hora) {
@@ -325,7 +376,7 @@
                     "📌 Recomendamos adicionar este contato à sua agenda para evitar perda de futuras notificações. Responda com *'RECEBIDO'* para validar o canal.",
                     "🤝 Sua confirmação é importante. Salve este número em seus contatos e responda com *'CIENTE E RECEBIDO'* para concluir o cadastro deste canal.",
                     "📢 Para continuar recebendo comunicados automáticos da escola, adicione este número aos seus contatos e responda com *'OK'*.",
-                    "✅ Confirme o recebimento desta notificação respondendo *'CIENTE'* and mantenha este número salvo em sua agenda.",
+                    "✅ Confirme o recebimento desta notificação respondendo *'CIENTE'* and mantenha este número salvo in sua agenda.",
                     "📱 Salve este contato para receber futuras informações acadêmicas e responda com *'CONFIRMADO'*.",
                     "🔐 Este é um canal oficial de comunicação escolar. Adicione-o à sua agenda e responda com *'RECEBIDO E CIENTE'*.",
                     "📬 Ajude-nos a manter a comunicação active: salve este número e responda com *'VERIFICADO'* para confirmar o recebimento."
@@ -349,7 +400,7 @@
                 let num = "55" + telefone.replace(/\D/g, '').replace(/^55/, '');
                 if (num.length === 13) num = num.substring(0, 4) + num.substring(5);
 
-                console.log(`Fila Sequencial | Iniciando contagem de delay isolado para ${nomeU}: ${delayEscolhido} segundos...`);
+                console.log(`[${terminalId}] Aguardando delay de segurança anti-ban para ${nomeU}: ${delayEscolhido}s...`);
                 
                 setTimeout(() => {
                     try {
@@ -363,7 +414,7 @@
                             headers: { 'Content-Type': 'application/json', ...(configEscola.zapiSecurity && { 'Client-Token': configEscola.zapiSecurity }) }, 
                             body: JSON.stringify({ phone: num, message: msgFinal, delayMessage: 0, delayTyping: 8 }) 
                         }).then(r => {
-                            console.log(`Fila Sequencial | Envio Realizado: ${registroId} do aluno ${nomeU}. Próximo da fila liberado.`);
+                            console.log(`[${terminalId}] Notificação enviada para o aluno ${nomeU}.`);
                             resolve(); 
                         }).catch(err => {
                             console.error(err);
