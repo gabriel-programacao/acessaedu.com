@@ -25,6 +25,10 @@
         .card-atraso { background: var(--pe-yellow); color: var(--pe-blue); padding: 15px; border-radius: 20px; animation: popIn 0.5s ease; }
         .card-bloqueio { background: var(--pe-red); color: white; padding: 15px; border-radius: 20px; animation: shake 0.5s ease-in-out; }
         .btn-voltar { position: fixed; top: 20px; left: 20px; background: rgba(255,255,255,0.2); color: white; border-radius: 30px; padding: 8px 20px; text-decoration: none; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.3); z-index: 100; }
+        
+        /* Estilo do novo Badge indicador de Fila adicionado no topo direito */
+        .badge-fila { position: absolute; top: 20px; right: 20px; background: rgba(0, 0, 0, 0.4); color: #fff; padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; border: 1px solid rgba(255, 255, 255, 0.15); font-weight: 500; display: none; backdrop-filter: blur(5px); z-index: 90; }
+        
         @keyframes popIn { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
     </style>
@@ -34,6 +38,8 @@
     <a href="dashboard.html" class="btn-voltar"><i class="fas fa-arrow-left me-2"></i> Voltar</a>
 
     <div class="terminal-container">
+        <div id="statusFila" class="badge-fila"><i class="fas fa-paper-plane me-2 text-warning"></i> Fila de Envios: <span id="contadorFila">0</span></div>
+        
         <div class="logo-terminal mb-3"><img src="logo_acessaedu.png" alt="AcessaEdu" style="max-height: 60px;"></div>
         <div class="video-wrapper">
             <video id="video" autoplay muted playsinline></video>
@@ -66,7 +72,6 @@
         let contadorEstabilidade = 0;
         let labelTemporariaAnterior = "";
 
-        // ACRESCENTADO: Estrutura de Fila Global para processamento síncrono da Z-API
         const filaDeMensagens = [];
         let filaProcessando = false;
 
@@ -109,7 +114,8 @@
                     }
                 });
 
-                const faceMatcher = new faceapi.FaceMatcher(labledDescriptors, 0.38); 
+                // ALTERADO: Reduzido o rigor sutilmente de 0.38 para 0.42 equilibrando aceitação biométrica e proteção
+                const faceMatcher = new faceapi.FaceMatcher(labledDescriptors, 0.42); 
 
                 setInterval(async () => {
                     if(isProcessing) return;
@@ -206,10 +212,13 @@
                 if (estaAtrasado) {
                     document.getElementById('display').innerHTML = `<div class="card-atraso"><h2>ENTRADA COM ATRASO</h2><p>${nome.toUpperCase()}<br>Horário: ${horaAtual}</p></div>`;
                     if (configEscola.mensagensAtActive || configEscola.mensagensAtivas) {
-                        // MODIFICADO: Em vez de disparar solto, o objeto com os dados vai para o final do Array da fila
                         if (info.telResp) {
                             filaDeMensagens.push({ telefone: info.telResp, alunoNome: nome, hora: horaAtual });
-                            processarProximaDaFila(); // Aciona a esteira de envios
+                            
+                            // ACRESCENTADO: Atualiza e exibe o contador na tela sempre que entra uma nova mensagem
+                            atualizarPainelFila();
+                            
+                            processarProximaDaFila(); 
                         }
                     }
                 } else {
@@ -221,22 +230,41 @@
             setTimeout(resetDisplay, 3000);
         }
 
-        // ACRESCENTADO: Gerenciador Assíncrono Sequencial da Fila (Garante a ordem cronológica exata de delays)
+        // ACRESCENTADO: Função interna auxiliar para gerenciar a visibilidade do painel numérico de contagem
+        function atualizarPainelFila() {
+            const painel = document.getElementById('statusFila');
+            const contador = document.getElementById('contadorFila');
+            const total = filaDeMensagens.length;
+
+            if (total > 0 || filaProcessando) {
+                // Soma 1 no contador de tarefas pendentes caso o processo de envio atual esteja ativo
+                const exibicaoTotal = total + (filaProcessando ? 1 : 0);
+                contador.innerText = exibicaoTotal;
+                painel.style.display = "block";
+            } else {
+                painel.style.display = "none";
+            }
+        }
+
         async function processarProximaDaFila() {
             if (filaProcessando || filaDeMensagens.length === 0) return;
             filaProcessando = true;
 
-            // Retira o elemento mais antigo da ponta da fila
             const tarefaAtual = filaDeMensagens.shift();
+            
+            // Atualiza o painel quando a mensagem sai da fila e entra em processamento ativo
+            atualizarPainelFila();
 
-            // Executa a função e espera ela terminar 100% (incluindo o tempo de delay) antes de liberar a próxima
             await executarEnvioZapi(tarefaAtual.telefone, tarefaAtual.alunoNome, tarefaAtual.hora);
 
             filaProcessando = false;
-            processarProximaDaFila(); // Chama recursivamente para a próxima mensagem
+            
+            // Atualiza novamente após a conclusão do envio
+            atualizarPainelFila();
+            
+            processarProximaDaFila(); 
         }
 
-        // ALTERADA: Função isolada e encapsulada com Promise para segurar a execução e garantir a ordenação linear
         function executarEnvioZapi(telefone, alunoNome, hora) {
             return new Promise(async (resolve) => {
                 if (!configEscola.zapiApi || !configEscola.zapiInstance || !configEscola.zapiToken) {
@@ -280,7 +308,7 @@
                     `Informação importante aos responsáveis: o(a) estudante *${nomeU}* chegou à unidade escolar após o início regular das aulas.\n\n🏫 Escola: *${escoU}*\n⌚ Horário de chegada: ${hora}`,
                     `Através do sistema de monitoramento escolar, registramos a entrada tardia de *${nomeU}* nesta data.\n\n📅 Data: ${dataHoje}\n⏰ Horário confirmed: ${hora}`,
                     `Registramos em nossa plataforma que o(a) aluno(a) *${nomeU}* ingressou na unidade escolar após o horário habitual de início das atividades.\n\n📅 Data: ${dataHoje}\n⏰ Entrada registrada: ${hora}`,
-                    `Comunicado automático: foi identificada a chegada de *${nomeU}* em horário posterior ao previsto para o início das aulas.\n\n🏫 Unidade: *${escoU}*\n⌚ Horário: ${hora}`,
+                    `Comunicado automático: foi identificada a chegada de *${nomeU}* in horário posterior ao previsto para o início das aulas.\n\n🏫 Unidade: *${escoU}*\n⌚ Horário: ${hora}`,
                     `O sistema AcessaEdu registrou a entrada de *${nomeU}* com atraso nesta data.\n\n📅 ${dataHoje}\n⏰ Horário de acesso: ${hora}`,
                     `Informamos aos responsáveis que *${nomeU}* teve sua presença registrada após o horário regular de entrada da instituição.\n\n🏫 Escola: *${escoU}*\n⌚ Registro: ${hora}`,
                     `Notificação de frequência: a entrada do(a) estudante *${nomeU}* ocorreu fora do horário previsto para início das atividades escolares.\n\n📅 Data: ${dataHoje}\n⏰ Horário registrado: ${hora}`
@@ -309,7 +337,6 @@
                 
                 const msgFinal = `${s}\n\n${c}\n\n${f}\n\n*${escoU}* sempre avançando, sempre junto!\n_Busca ativa junto da família._\n\n✅ Notificação AcessaEdu\n_Ref: ${registroId}_`;
 
-                // INTEGRADO: Sua lista estendida e personalizada de delays atualizada
                 const temposAleatorios = [45, 10, 29, 43, 14, 76, 87, 80, 89, 42, 78, 97, 44, 32, 21, 31, 56, 10, 20, 22, 25, 18, 45, 70, 98, 12, 86, 60, 75, 90, 105, 100, 180];
                 let delayEscolhido;
                 
@@ -324,7 +351,6 @@
 
                 console.log(`Fila Sequencial | Iniciando contagem de delay isolado para ${nomeU}: ${delayEscolhido} segundos...`);
                 
-                // Realiza a parada obrigatória e linear do fluxo de código
                 setTimeout(() => {
                     try {
                         let baseUrl = configEscola.zapiApi.trim();
@@ -338,10 +364,10 @@
                             body: JSON.stringify({ phone: num, message: msgFinal, delayMessage: 0, delayTyping: 8 }) 
                         }).then(r => {
                             console.log(`Fila Sequencial | Envio Realizado: ${registroId} do aluno ${nomeU}. Próximo da fila liberado.`);
-                            resolve(); // Libera o Promise permitindo o avanço do fluxo para o próximo da fila
+                            resolve(); 
                         }).catch(err => {
                             console.error(err);
-                            resolve(); // Libera em caso de falha de rede para não travar os próximos
+                            resolve(); 
                         });
                     } catch (e) { 
                         console.error("Erro Z-API:", e); 
