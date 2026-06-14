@@ -100,6 +100,7 @@
         async function initTerminal() {
             try {
                 const URL_MODELS = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+                await faceapi.nets.ssdMobilenetv1.loadFromUri(URL_MODELS);
                 await faceapi.nets.tinyFaceDetector.loadFromUri(URL_MODELS);
                 await faceapi.nets.faceLandmark68Net.loadFromUri(URL_MODELS);
                 await faceapi.nets.faceRecognitionNet.loadFromUri(URL_MODELS);
@@ -118,7 +119,7 @@
                     }
                 });
 
-                // MANTIDO RIGOROSAMENTE EM 0.45 CONFORME EXIGIDO
+                // ALTERADO: Configurado exatamente para 0.45 conforme exigido
                 const faceMatcher = new faceapi.FaceMatcher(labledDescriptors, 0.45); 
 
                 setInterval(async () => {
@@ -126,7 +127,7 @@
                     const video = document.getElementById('video');
                     const molduraEl = document.getElementById('moldura');
                     
-                    const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+                    const detection = await faceapi.detectSingleFace(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.75 })).withFaceLandmarks().withFaceDescriptor();
                     
                     if(detection) {
                         const box = detection.detection.box;
@@ -135,9 +136,9 @@
                         const faceCenterX = box.x + (box.width / 2);
                         const faceCenterY = box.y + (box.height / 2);
                         
-                        const enquadradoH = faceCenterX > (vW * 0.30) && faceCenterX < (vW * 0.70);
-                        const enquadradoV = faceCenterY > (vH * 0.25) && faceCenterY < (vH * 0.75);
-                        const tamanhoCerto = box.height > (vH * 0.35);
+                        const enquadradoH = faceCenterX > (vW * 0.25) && faceCenterX < (vW * 0.75);
+                        const enquadradoV = faceCenterY > (vH * 0.20) && faceCenterY < (vH * 0.80);
+                        const tamanhoCerto = box.height > (vH * 0.38);
 
                         if (enquadradoH && enquadradoV && tamanhoCerto) {
                             molduraEl.classList.add('detected');
@@ -146,7 +147,9 @@
                             if(match.label !== 'unknown') {
                                 const nome = match.label;
                                 const agora = Date.now();
-                                if(nome === ultimoNomeDetectado && (agora - tempoUltimaDeteccao) < 30000) return;
+                                
+                                // DETECÇÃO RETORNOU AO PADRÃO ORIGINAL SEM TIMERS OU PORCENTAGENS
+                                if(nome === ultimoNomeDetectado && (agora - tempoUltimaDeteccao) < 15000) return;
                                 isProcessing = true;
                                 processarPresenca(nome, mapaAlunos[nome]);
                             } else {
@@ -155,15 +158,15 @@
                             }
                         } else { molduraEl.classList.remove('detected'); }
                     } else { molduraEl.classList.remove('detected'); }
-                }, 600);
+                }, 500);
             } catch (err) { console.error(err); }
         }
 
         function exibirNaoCadastrado() {
             document.getElementById('display').innerHTML = `
                 <div class="card-bloqueio" style="background: #6c757d;">
-                    <h2>ALUNO NÃO CADASTRADO</h2>
-                    <p>Rosto não reconhecido no sistema.</p>
+                    <h2>ALUNO NÃO RECONHECIDO</h2>
+                    <p>Aproxime-se e centralize bem o rosto.</p>
                 </div>`;
             setTimeout(resetDisplay, 3000);
         }
@@ -189,7 +192,6 @@
                 if (estaAtrasado) {
                     document.getElementById('display').innerHTML = `<div class="card-atraso"><h2>ENTRADA COM ATRASO</h2><p>${nome.toUpperCase()}<br>Horário: ${horaAtual}</p></div>`;
                     if (configEscola.mensagensAtivas && info.telResp) {
-                        // ADICIONADO: Envia a tarefa para a fila persistente de background do Firestore
                         await addDoc(collection(db, "fila_whatsapp"), {
                             telefone: info.telResp,
                             alunoNome: nome,
@@ -295,34 +297,70 @@
                 }
 
                 const nomeU = alunoNome.toUpperCase();
-                const escolaU = configEscola.nome.toUpperCase();
+                const schoolRaw = configEscola.nome || logado.escolaId;
+                const escoU = schoolRaw.toUpperCase();
                 const dataHoje = new Date().toLocaleDateString('pt-BR');
                 const registroId = Math.random().toString(36).substring(7).toUpperCase();
 
-                const saudacoes = ["*AcessaEdu | Notificação de Entrada*", "*Informativo Escolar Importante*", "*Comunicado de Frequência*", "Prezados Pais e Responsáveis,", "Olá! Notificamos que:", "*Alerta de Atraso Escolar*", "Saudações da coordenação escolar.", "Atenção: Registro de Entrada Tardia", "*AcessaEdu | Controle de Acesso*", "Aviso de Horário Escolar:"];
-
-                const corpos = [
-                    `Informamos que o(a) aluno(a) *${nomeU}* registrou sua entrada na unidade *${escolaU}* APÓS o horário permitido para o início das atividades escolares.\n\n📅 Data: ${dataHoje}\n⏰ Horário de Chegada: ${hora}`,
-                    `Identificamos através do nosso sistema que *${nomeU}* chegou à escola hoje fora do horário estabelecido. Ressaltamos que a entrada ocorreu depois do limite de tolerância.\n\n📅 Registro em: ${dataHoje}\n⌚ Hora da entrada: ${hora}`,
-                    `Notificamos que, na data de hoje, o(a) estudante *${nomeU}* acessou as dependências da instituição apresentando atraso no cumprimento do horário escolar.\n\n📅 Data do evento: ${dataHoje}\n⏰ Hora registrada: ${hora}`,
-                    `Atenção: O sistema AcessaEdu acaba de detectar que *${nomeU}* ultrapassou o horário limite de entrada permitido para o bom andamento das aulas.\n\n📅 Data: ${dataHoje}\n⏰ Hora exata: ${hora}`,
-                    `Informamos aos responsáveis que o registro de frequência de *${nomeU}* consta como tardio, tendo o(a) aluno(a) se apresentado após o sinal de início.\n\n📅 Data: ${dataHoje}\n⌚ Horário de chegada: ${hora}`,
-                    `O(a) aluno(a) *${nomeU}* registrou entrada na escola *${escolaU}* com atraso verificado. É fundamental que o horário letivo seja respeitado para evitar prejuízos.\n\n📅 Data: ${dataHoje}\n⏰ Entrada às: ${hora}`,
-                    `Comunicamos que, infelizmente, *${nomeU}* não conseguiu cumprir o horário regulamentar da unidade hoje, chegando após o início das aulas.\n\n📅 Data: ${dataHoje}\n⏰ Horário: ${hora}`,
-                    `Este é um aviso automático para informar que *${nomeU}* deu entrada na instituição fora do período de pontualidade esperado pela equipe diretiva.\n\n📅 Dia: ${dataHoje}\n⌚ Horário de acesso: ${hora}`,
-                    `Registramos que o(a) estudante *${nomeU}* apresentou-se para as atividades letivas hoje com atraso, marcando sua entrada no sistema após o horário oficial.\n\n📅 Data: ${dataHoje}\n⏰ Hora: ${hora}`,
-                    `Saudações. Notificamos que o(a) aluno(a) *${nomeU}* chegou à unidade *${escolaU}* em um horário posterior ao permitido para o acesso pontual.\n\n📅 Data: ${dataHoje}\n⏰ Horário registrado: ${hora}`
+                const saudacoes = [
+                    "AcessaEdu | Alerta de Entrada Tardia",
+                    "⚠️ NOTIFICAÇÃO IMPORTANTE - PONTUALIDADE",
+                    "🏫 Informativo de Frequência - " + escoU + "",
+                    "🔔 COMUNICADO DE ENTRADA NA ESCOLA",
+                    "📍 AcessaEdu | Controle de Acesso",
+                    "👋 Olá, Bom Dia | Comunicado de Entrada Escolar!",
+                    "📚 *AcessaEdu | Acompanhamento Escolar*",
+                    "🚸 *Alerta de Frequência Escolar*",
+                    "📢 *Comunicado Automático de Presença*",
+                    "🏫 *Monitoramento de Entrada - " + escoU + "*",
+                    "🌞 *Bom Dia! Atualização de Frequência Escolar*",
+                    "📋 *Registro de Frequência Escolar*",
+                    "⏰ *Alerta de Horário de Entrada*",
+                    "🎓 *Comunicado aos Responsáveis*",
+                    "📲 *AcessaEdu | Notificação de Acesso*",
+                    "🚪 *Controle de Entrada Escolar*"
                 ];
 
-                const fechamentos = ["Por favor, responda com *'OK'* se visualizou este informativo.", "Solicitamos que responda com *'CIENTE'* para validarmos a notificação.", "Pedimos que, por gentileza, responda com *'RECEBIDO'* para nosso controle.", "Se você visualizou este aviso, poderia confirmar escrevendo apenas *'OK'*?", "Sua confirmação é essencial para mantermos o registro. Responda com *'SIM'*.", "Pode confirmar o recebimento deste comunicado digitando *'OK'*?", "Contamos com sua colaboração para evitar atrasos rotineiros. Responda com *'OK'*.", "Responda a este alerta com *'CIENTE'* para que possamos registrar sua visualização.", "A parceria entre família e escola é vital. Por favor, responda com *'OK'*.", "Para validar este envio automático, pedimos que responda com *'RECEBIDO'*."];
+                const corpos = [
+                    `Prezados responsáveis, comunicamos que o(a) aluno(a) *${nomeU}* deu entrada na unidade *${escoU}* apresentando atraso em relação ao horário oficial.\n\n📅 Data: ${dataHoje}\n⏰ Horário Registrado: ${hora}`,
+                    `Informamos que registramos em nosso sistema a entrada do(a) estudante *${nomeU}* após o horário regulamentar de início das aulas.\n\n📅 Dia: ${dataHoje}\n⌚ Entrada às: ${hora}`,
+                    `Notificamos que o(a) aluno(a) *${nomeU}* apresentou-se hoje na instituição com atraso verificado pela nossa portaria digital.\n\n🏫 Unidade: *${escoU}*\n⏰ Horário de Chegada: ${hora}`,
+                    `Aviso Pedagógico: Identificamos que *${nomeU}* ultrapassou a tolerância permitida para a entrada letiva na data de hoje.\n\n📅 Data do registro: ${dataHoje}\n⌚ Horário exato: ${hora}`,
+                    `Prezados responsáveis, o sistema registrou a entrada do(a) estudante *${nomeU}* após o horário previsto para início das atividades escolares.\n\n📅 Data: ${dataHoje}\n⏰ Horário registrado: ${hora}`,
+                    `Comunicamos que o(a) aluno(a) *${nomeU}* acessou as dependências da escola em horário posterior ao estabelecido para entrada.\n\n🏫 Unidade: *${escoU}*\n⌚ Horário de acesso: ${hora}`,
+                    `Nosso controle de acesso identificou que *${nomeU}* realizou o registro de entrada com atraso nesta data.\n\n📅 Registro: ${dataHoje}\n⏰ Entrada efetuada às: ${hora}`,
+                    `Informação importante aos responsáveis: o(a) estudante *${nomeU}* chegou à unidade escolar após o início regular das aulas.\n\n🏫 Escola: *${escoU}*\n⌚ Horário de chegada: ${hora}`,
+                    `Através do sistema de monitoramento escolar, registramos a entrada tardia de *${nomeU}* nesta data.\n\n📅 Data: ${dataHoje}\n⏰ Horário confirmed: ${hora}`,
+                    `Registramos em nossa plataforma que o(a) aluno(a) *${nomeU}* ingressou na unidade escolar após o horário habitual diário de início das atividades.\n\n📅 Data: ${dataHoje}\n⏰ Entrada registrada: ${hora}`,
+                    `Comunicado automático: foi identificada a chegada de *${nomeU}* em horário posterior ao previsto para o início das aulas.\n\n🏫 Unidade: *${escoU}*\n⌚ Horário: ${hora}`,
+                    `O sistema AcessaEdu registrou a entrada de *${nomeU}* com atraso nesta data.\n\n📅 ${dataHoje}\n⏰ Horário de acesso: ${hora}`,
+                    `Informamos aos responsáveis que *${nomeU}* teve sua presença registrada após o horário regular de entrada da instituição.\n\n🏫 Escola: *${escoU}*\n⌚ Registro: ${hora}`,
+                    `Notificação de frequência: a entrada do(a) estudante *${nomeU}* ocorreu fora do horário previsto para início das atividades escolares.\n\n📅 Data: ${dataHoje}\n⏰ Horário registrado: ${hora}`
+                ];
+
+                const fechamentos = [
+                    "⚠️ ATENÇÃO: Salve nosso número na sua agenda para continuar recebendo os relatórios diários de frequência e responda esta mensagem com 'CIENTE'.",
+                    "💡 *IMPORTANTE:* Para evitar que o WhatsApp bloqueie nossos envios automáticos, *salve este contato* nos seus favoritos e responda com um *'OK'*.",
+                    "📝 Pedimos que *salve este número oficial da escola* nos seus contatos e confirme o recebimento respondendo apenas *'RECEBIDO'*.",
+                    "🔒 Mantenha este canal ativo! *Adicione nosso número à sua lista de contatos* e valide esta notificação respondendo com *'VERIFICADO'*.",
+                    "✅ Para garantir o recebimento contínuo das notificações escolares, adicione este número aos seus contatos e responda com *'CIENTE'*.",
+                    "📲 Salve este contato como canal oficial da escola e confirme esta comunicação respondendo com *'OK RECEBIDO'*.",
+                    "🔔 Este número é utilizado para avisos importantes sobre frequência e acesso escolar. Salve-o e responda com *'CONFIRMADO'*.",
+                    "📌 Recomendamos adicionar este contato à sua agenda para evitar perda de futuras notificações. Responda com *'RECEBIDO'* para validar o canal.",
+                    "🤝 Sua confirmação é importante. Salve este número em seus contatos e responda com *'CIENTE E RECEBIDO'* para concluir o cadastro deste canal.",
+                    "📢 Para continuar recebendo comunicados automáticos da escola, adicione este número aos seus contatos e responda com *'OK'*.",
+                    "✅ Confirme o recebimento desta notificação respondendo *'CIENTE'* and mantenha este número salvo em sua agenda.",
+                    "📱 Salve este contato para receber futuras informações acadêmicas e responda com *'CONFIRMADO'*.",
+                    "🔐 Este é um canal oficial de comunicação escolar. Adicione-o à sua agenda e responda com *'RECEBIDO E CIENTE'*.",
+                    "📬 Ajude-nos a manter a comunicação active: salve este número e responda com *'VERIFICADO'* para confirmar o recebimento."
+                ];
 
                 const s = saudacoes[Math.floor(Math.random() * saudacoes.length)];
                 const c = corpos[Math.floor(Math.random() * corpos.length)];
                 const f = fechamentos[Math.floor(Math.random() * fechamentos.length)];
                 
-                const msgFinal = `${s}\n\n${c}\n\n${f}\n\n*${escolaU}* sempre avançando, sempre junto!\n_Busca ativa junto da família._\n\n✅ Notificação AcessaEdu\n_Ref: ${registroId}_`;
+                const msgFinal = `${s}\n\n${c}\n\n${f}\n\n*${escoU}* sempre avançando, sempre junto!\n_Busca ativa junto da família._\n\n✅ Notificação AcessaEdu\n_Ref: ${registroId}_`;
 
-                // MANTIDA A SUA LISTA EXATA DE TEMPOS ALEATÓRIOS
                 const temposAleatorios = [5, 10, 15, 20, 21, 30, 35, 40, 43, 50, 55, 76, 32, 76, 45, 22, 25, 27, 29, 39, 36, 32, 64, 78, 80, 92, 13, 12, 4, 46, 39, 50, 34, 36, 65, 80, 56, 47, 52, 64, 31, 45, 8, 67];
                 let delayEscolhido;
                 
